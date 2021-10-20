@@ -21,7 +21,7 @@ ___
 
 Within many of these algorithms, the following topics may be covered:
 
-<li> Using Principal Component Analysis for Dimentionalty reduction.  </li>
+<li> Using Principal Component Analysis for Dimentionalty reduction</li>
 <li> Partition of data for training and testing</li>
 <li> Performance Measures of errors with confidence intervals </li>
 <li> The use of markdown and LaTeX encoding to write files   </li>
