@@ -3,6 +3,9 @@
 For this second homework assignment 2, we focus on working with the a zip file of packages found on the University of California Irvine Machine Learning Repository,of the given package, [here](https://archive.ics.uci.edu/ml/datasets/Character+Font+Images). This package contains 153 fonts of each 20x20 pixel representation. For this homework we are to select 4 fonts to create a classifier to predict the given font using the K Nearest Neighbor algorithm. We then applied PCA on to the given datasets reduce the size while encapsulating a large portion of the data. 
 
 
+This project was done in collaboration with two other students in this Graduate School Program. The following two names are of the students whom, worked on the homework. Basel Najjar and Soo Jong Cho
+
+
 <ul>
 <li>The project has three parts of: </li>
 <ul>
