@@ -1,0 +1,948 @@
+---
+title: "MATH 6350 - HW2"
+author: "Soo Jong Cho, Brian Le, Basel Najjar"
+date: "9/21/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+#Setting up knitr, installing packages
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("ggplot2")
+#install.packages("kableExtra")
+#install.packages("tidyverse")
+#install.packages("lemon")
+library(ggplot2)
+library(kableExtra)
+library(tidyverse)
+library(data.table)
+library(rsample)
+library(class)
+library(reshape2)
+library(cowplot)
+library(dplyr)
+library(lemon)
+```
+
+# Scope  
+
+```{r, include= FALSE}
+#Importing fonts 1, 2, 3, 4
+vladimir_raw = read.csv('VLADIMIR.csv', header = TRUE)
+georgia_raw = read.csv('GEORGIA.csv', header = TRUE)
+comic_raw = read.csv('COMIC.csv', header = TRUE)
+nina_raw = read.csv('NINA.csv', header = TRUE)
+```
+
+```{r,include=FALSE}
+#Removing columns containing unneeded information
+vladimir = vladimir_raw[c(-2:-3,-6:-12)]
+georgia = georgia_raw[c(-2:-3,-6:-12)]
+comic = comic_raw[c(-2:-3,-6:-12)]
+nina = nina_raw[c(-2:-3,-6:-12)]
+
+#Removing rows that contain missing data
+vladimir = vladimir[complete.cases(vladimir),]
+georgia = georgia[complete.cases(georgia),]
+comic = comic[complete.cases(comic),]
+nina = nina[complete.cases(nina),]
+
+#Changing name in 'font' to CL1,...,CL4
+vladimir$font = "CL1"
+georgia$font = "CL2"
+comic$font = "CL3"
+nina$font = "CL4"
+```
+
+```{r,include=FALSE}
+#Defining "normal" font type as classes CL1,...,CL4
+#"normal" means not bold nor italicized
+CL1 = subset(vladimir, strength == 0.4 & italic == 0)
+CL2 = subset(georgia, strength == 0.4 & italic == 0)
+CL3 = subset(comic, strength == 0.4 & italic == 0)
+CL4 = subset(nina, strength == 0.4 & italic == 0)
+
+#Removing columns containing 'strength' and 'italic'
+CL1 = CL1[-2:-3]
+CL2 = CL2[-2:-3]
+CL3 = CL3[-2:-3]
+CL4 = CL4[-2:-3]
+
+#Renaming the feature columns of CL1,...,CL4 to X1,...,X400
+names_list = NULL #initialize an empty list
+
+for (i in 1:400){ #naming 400 columns X1 to X400
+ names_list[[i]] = paste("X",i,sep = "")
+}
+colnames(CL1)[2:401] = c(names_list)
+colnames(CL2)[2:401] = c(names_list)
+colnames(CL3)[2:401] = c(names_list)
+colnames(CL4)[2:401] = c(names_list)
+
+#Defining number of rows
+nCL1 = nrow(CL1)
+nCL2 = nrow(CL2)
+nCL3 = nrow(CL3)
+nCL4 = nrow(CL4)
+
+#Regrouping CL1,...,CL4 into one group called "DATA"
+DATA = rbind(CL1,CL2,CL3,CL4)
+nDATA = nrow(DATA) #calculating rows in DATA 
+
+colnames(DATA)[1] = c("TRUC") #renaming font to "TRUC"
+DATA$TRUC = as.factor(DATA$TRUC) #converting TRUC to factor
+```
+
+# Preliminary Treatment of Data
+
+The sizes of each class are as follows:  
+* CL1 contains `r nCL1` entries (N1).  
+* CL2 contains `r nCL2` entries (N2).  
+* CL3 contains `r nCL3` entries (N3).
+* CL4 contains `r nCL4` entries (N4).  
+* In total, there are `r nDATA` entries (N).
+
+```{r, echo = FALSE}
+#Mean of feature X210 for CL1,...,CL4
+meanCL1 = mean(CL1$X210) #mean of feature X210 for CL1
+meanCL2 = mean(CL2$X210) #mean of feature X210 for CL2
+meanCL3 = mean(CL3$X210) #mean of feature X210 for CL3
+meanCL4 = mean(CL4$X210) #mean of feature X210 for CL4
+meanDATA = mean(DATA$X210) #mean of feature X210 for all classes
+
+C = .9 #setting confidence level of 90%
+
+#t-test for CL1,...,CL4
+#Obtain t critical values for each class
+t_CL1 = qt((1+C)/2,nCL1-1) #t critical value CL1
+t_CL2 = qt((1+C)/2,nCL2-1) #t critical value CL2
+t_CL3 = qt((1+C)/2,nCL3-1) #t critical value CL3
+t_CL4 = qt((1+C)/2,nCL4-1) #t critical value CL4
+
+#Confidence intervals for C1,...,CL4
+lo_CL1 = meanCL1 - t_CL1*sd(CL1$X210)/sqrt(nCL1) #CI for CL1
+hi_CL1 = meanCL1 + t_CL1*sd(CL1$X210)/sqrt(nCL1)
+
+lo_CL2 = meanCL2 - t_CL2*sd(CL2$X210)/sqrt(nCL2) #CI for CL2
+hi_CL2 = meanCL2 + t_CL2*sd(CL2$X210)/sqrt(nCL2)
+
+lo_CL3 = meanCL3 - t_CL3*sd(CL3$X210)/sqrt(nCL3) #CI for CL3
+hi_CL3 = meanCL3 + t_CL3*sd(CL3$X210)/sqrt(nCL3)
+
+lo_CL4 = meanCL4 - t_CL4*sd(CL4$X210)/sqrt(nCL4) #CI for CL4
+hi_CL4 = meanCL4 + t_CL4*sd(CL4$X210)/sqrt(nCL4)
+
+#create a table of the results of CI calculations for each class
+conf_table = data.frame(Class = rep(c("CL1", "CL2", "CL3", "CL4")), 
+                        Lower = rep(round(c(lo_CL1,lo_CL2,lo_CL3,lo_CL4),1)),
+                        Mean = rep(round(c(meanCL1,meanCL2,meanCL3,meanCL4)),1),
+                        Upper = rep(round(c(hi_CL1,hi_CL2,hi_CL3,hi_CL4),1)))
+
+
+#get the true class of each row of the column X210
+X210_df = as.data.frame(cbind(DATA$TRUC,DATA$X210))
+names(X210_df) = c("TRUC","X210") #rename columns
+X210_df$TRUC = as.factor(X210_df$TRUC) #convert to TRUC factor
+
+#create a dataframe of the class, their means and CI values
+X210_data = data.frame(Class = c("CL4","CL3","CL2","CL1"), 
+                       Mean = c(meanCL4,meanCL3,meanCL2,meanCL1),
+                       Low = c(lo_CL4,lo_CL3,lo_CL2,lo_CL1), 
+                       High = c(hi_CL4,hi_CL3,hi_CL2,hi_CL1))
+
+conf_table #display CI table
+#Plot of the CI for X210 in each class 
+ggplot() + 
+  geom_pointrange(data = X210_data,mapping = aes(x=Class,y=Mean,ymin=Low,ymax=High,color = Class), 
+                  size=1.5, fill="white", shape=22) +
+  labs(title = "Feature X210 - 90% CI for All Classes") + 
+  xlab("Class")+ ylab("Feature X210 Value")+
+  theme(plot.title = element_text(hjust = 0.5)) + coord_flip() + 
+  scale_color_manual(values = c("red","blue","springgreen","sienna3"))
+```
+
+# Part 1  
+## 1.1  
+Upon first examination, the mean value of feature X210 across the four classes is varied. However, a t-test at the 95% confidence level suggests significant intersection in the mean value of feature X210 across the four classes. This intersection can be measured by the width of overlap in the 95% confidence intervals (CI) between two classes.   
+* CI overlap for CL1 vs. CL2: `r round(hi_CL2 - lo_CL1,2)`  1v2
+* CI overlap for CL1 vs. CL3: `r round(hi_CL1 - lo_CL3,2)`  1v2
+* CI overlap for CL1 vs. CL4: `r round(hi_CL4 - lo_CL1,2)`  1v4
+* CI overlap for CL2 vs. CL4: `r round(hi_CL2 - lo_CL4,2)`  2v4
+* CI overlap for CL3 vs. CL4: `r round(hi_CL4 - lo_CL3,2)`  3v4
+
+The mean value of feature X210 in Class 3 is the most unique, as CL3 has only a small CI overlap with CL4. Class 4 is the least unique, as it has CI overlap with all of the three other classes. Classes CL1 and CL2 both have moderate intersection with the other classes.  
+
+It should be noted that the t-test pre-supposes that the data follow a normal distribution. The histograms discussed in the next section display that the data for feature X210 does not follow a normal distribution in any of the four classes. Therefore, a different method of testing feature discrimination power should be utilized.   
+
+
+```{r, echo = FALSE}
+# Histograms for CL1, CL2, CL3, CL4 with mean and 90% CI
+ggplot(CL1,aes(X210)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = 25, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Feature X210 for Class CL1")+ xlab("X210 Value for Class CL1")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_x_continuous(breaks=c(seq(0,max(CL1$X210),25))) + 
+  scale_y_continuous(breaks=c(seq(0,.6,.1)),limits = c(0,0.55)) + 
+  geom_vline(aes(xintercept=lo_CL1, color = "Lower"), linetype="dashed", color = "red", size=1.5) +
+  geom_vline(aes(xintercept=meanCL1, color = "Mean"), linetype="solid", color = "black", size=1.5) +
+  geom_vline(aes(xintercept=hi_CL1,color = "Upper"), linetype="dashed", color = "blue", size=1.5)
+
+ggplot(CL2,aes(X210)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = 25, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Feature X210 for Class CL2")+ xlab("X210 Value for Class CL2")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks=c(seq(0,max(CL2$X210),25))) + 
+  scale_y_continuous(breaks=c(seq(0,.6,.1)),limits = c(0,0.55)) + 
+  geom_vline(xintercept = meanCL2, linetype="solid", color = "black", size=1.5) + 
+  geom_vline(xintercept = lo_CL2, linetype="dashed", color = "red", size=1.5) + 
+  geom_vline(xintercept = hi_CL2, linetype="dashed", color = "blue", size=1.5)
+
+ggplot(CL3,aes(X210)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = 25, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Feature X210 for Class CL3")+ xlab("X210 Value for Class CL3")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks=c(seq(0,max(CL3$X210),25))) + 
+  scale_y_continuous(breaks=c(seq(0,.6,.1)),limits = c(0,0.55)) + 
+  geom_vline(xintercept = meanCL3, linetype="solid", color = "black", size=1.5) + 
+  geom_vline(xintercept = lo_CL3, linetype="dashed", color = "red", size=1.5) + 
+  geom_vline(xintercept = hi_CL3, linetype="dashed", color = "blue", size=1.5)
+
+ggplot(CL4,aes(X210)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = 25, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Feature X210 for Class CL4")+ xlab("X210 Value for Class CL4")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_x_continuous(breaks=c(seq(0,max(CL4$X210),25))) + 
+  scale_y_continuous(breaks=c(seq(0,.6,.1)),limits = c(0,0.55)) + 
+  geom_vline(xintercept = meanCL4, linetype="solid", color = "black", size=1.5) + 
+  geom_vline(xintercept = lo_CL4, linetype="dashed", color = "red", size=1.5) + 
+  geom_vline(xintercept = hi_CL4, linetype="dashed", color = "blue", size=1.5)
+
+#Histogram showing all 4 classes
+ggplot() +
+  geom_histogram(aes(X210, fill = TRUC),binwidth = 30, data = X210_df) +
+  labs(title = "Histogram of Feature X210 for All Classes") + 
+  ylab("Count") + xlab("Feature X210") + 
+  theme(plot.title = element_text(hjust = 0.5))  +
+  scale_fill_manual(values = c("red","blue","springgreen","sienna3"),name = "Class")
+
+```
+
+The histograms of feature X210 show similar characteristics across all four classes. There is a concentration of cases with extreme values of feature X210; the minority of cases have values of X210 near the mean. In addition, the histograms support the same conclusion reached by comparing confidence intervals: there is significant intersection of all four classes with respect to feature X210.
+
+Each feature (X0, ..., X400) represents the grayness of a pixel. A feature value of 0 represents x, and a feature valye of 255 represents yyy. Therefore, it is expected that feature X210 takes on primarily values of either nearly white or nearly black..
+
+```{r, include= FALSE}
+ks_12D = as.numeric(ks.test(CL1$X210, CL2$X210)[1])                                                     #KS-test of CL1 and CL2 and the distance between CDFs
+ks_13D = as.numeric(ks.test(CL1$X210, CL3$X210)[1])                                                     #KS-test of CL1 and CL3 and the distance between CDFs
+ks_14D = as.numeric(ks.test(CL1$X210, CL4$X210)[1])                                                     #KS-test of CL1 and CL4 and the distance between CDFs
+ks_23D = as.numeric(ks.test(CL2$X210, CL3$X210)[1])                                                     #KS-test of CL2 and CL3 and the distance between CDFs
+ks_24D = as.numeric(ks.test(CL2$X210, CL4$X210)[1])                                                     #KS-test of CL2 and CL4 and the distance between CDFs
+ks_34D = as.numeric(ks.test(CL3$X210, CL4$X210)[1])                                                     #KS-test of CL3 and CL4 and the distance between CDFs
+
+ks_12P = as.numeric(ks.test(CL1$X210, CL2$X210)[2])                                                     #KS-test of CL1 and CL2 and how similar they are 
+ks_13P = as.numeric(ks.test(CL1$X210, CL3$X210)[2])                                                     #KS-test of CL1 and CL3 and how similar they are 
+ks_14P = as.numeric(ks.test(CL1$X210, CL4$X210)[2])                                                     #KS-test of CL1 and CL4 and how similar they are 
+ks_23P = as.numeric(ks.test(CL2$X210, CL3$X210)[2])                                                     #KS-test of CL2 and CL3 and how similar they are 
+ks_24P = as.numeric(ks.test(CL2$X210, CL4$X210)[2])                                                     #KS-test of CL2 and CL4 and how similar they are 
+ks_34P = as.numeric(ks.test(CL3$X210, CL4$X210)[2])                                                     #KS-test of CL3 and CL4 and how similar they are 
+```
+
+The Kolmogorov-Smirnov test (KS-test) provides a quantitative method to measure the difference between two histograms. The KS-test returns two values:  
+1. The maximum vertical distance between the two cumulative distribution functions (D-value). The closer the D-value is to zero, the more similar the two distributions are. Within the context of automatic classification, a large value of D indicates good discriminating power of a given feature between two classes. 
+2. The probability that a case observed in the population is at least as extreme as the cases observed in the sample (p-value). The p-value is not unique to the KS-test and is commonly used in hypothesis testing. Comparing the p-value to a selected significance level, a, we can reject or fail to reject the null hypothesis. Within the context of automatic classification, the null hypothesis states that the two distributions are not different. 
+
+The distances of feature vector X210 for each of the four classes is outlined below:   
+```{r, echo = FALSE}
+#create a dataframe of the values produced in the KS-test
+d_table = data.frame(Class = rep(c("CL1", "CL2", "CL3", "CL4")), 
+                        CL1 = rep(round(c(0,ks_12D,ks_13D,ks_14D),2)),
+                        CL2 = rep(round(c(ks_12D,0,ks_23D,ks_24D),2)),
+                        CL3 = rep(round(c(ks_13D,ks_23D,0,ks_34D),2)),
+                        CL4 = rep(round(c(ks_14D,ks_24D,ks_34D,0),2)))
+d_table #show results in a table
+
+
+#create a dataframe of the values produced in the KS-test
+p_table = data.frame(Class = rep(c("CL1", "CL2", "CL3", "CL4")), 
+                        CL1 = rep(round(c(0,ks_12P,ks_13P,ks_14P),3)),
+                        CL2 = rep(round(c(ks_12P,0,ks_23P,ks_24P),3)),
+                        CL3 = rep(round(c(ks_13P,ks_23P,0,ks_34P),3)),
+                        CL4 = rep(round(c(ks_14P,ks_24P,ks_34D,0),3)))
+d_table #show results in a table
+p_table
+```
+
+## 1.2  
+```{r, echo=FALSE}
+#DATA contains all 4 classes, filtered for bold and italics
+
+DATA_features = DATA[-1] #Subsetting DATA into features only 
+corr_matrix_full = cor(DATA_features) #Taking 400x400 correlation matrix
+
+corr_matrix = as.data.frame(as.table(corr_matrix_full)) #Taking 400x400 correlation matrix
+corr_matrix = subset(corr_matrix, abs(Freq) !=1) #Removing values = 1 (diagonal entries)
+
+corr_matrix$sign = ifelse(corr_matrix$Freq > 0, 1,-1) #Adding new column to track sign of cor value
+corr_matrix$Freq = abs(corr_matrix$Freq) #Converting cor value to abs(cor)
+corr_matrix = corr_matrix[!duplicated(corr_matrix$Freq),] #Removing pair-wise entries (duplicate values)
+
+corr_top_10 <- corr_matrix %>% #Taking the top ten abs(cor) values
+  arrange(desc(Freq)) %>% 
+  slice(1:10)
+
+corr_top_10$Freq = corr_top_10$Freq * corr_top_10$sign #multiplying the sign back into the cor value
+corr_top_10 = corr_top_10[-4] #removing the column containing sign
+names(corr_top_10) = c("Feature 1", "Feature 2", "Correlation Coefficient") #Renaming columns
+corr_top_10 #display top ten results
+```
+400 features across all four classes (CL1,...,CL4), 400x400 correlation matrix into 400 (20x20) original features of X1…X400. The team found the 10 highest absolute values |CORR(I,j)| correlation values. The above 10 top highest correlation values show the pixel positions corresponding to one another pair in terms of Xi and Xj. It shows that the X399 feature 1 and X398 feature 2 comes out to be the highest coefficient score in the correlation matrix, which is 0.9427. The top 10 highest values show how the correlation matrix of 20x20 appears to be linearly correlated across all cases. As it shows from the excel table from the below, the 10 highest correlated values are adjacent to each other on the table. The team found an interesting relationship where most of the highest correlated matrix features were clustered around in one section of the matrix table. Those are the following sections X202 and X182, X242 and X222, X222 and X202, X 242 and X222, X262 and X242, X241 and X221, and lastly X243 and X223.   
+
+Pix(6,1) and pix(6,18) correlation = `r cor(DATA$X122,DATA$X139)`. low b/c all the way across the map.
+Pix(6,1) and pix(6,18) correlation = `r cor(DATA$X134,DATA$X154)`. high b/c adjacent.
+
+When recalling the grey level of pixel pix(6,1) and pix(6,18), the correlation of the X122 and X139 comes out to be 0.4999, which is low because the two points are far across the map. However, the X134 and X154 turn out to be 0.7095, which is higher because the two points are adjacen
+
+## 1.3 & 1.4  
+
+```{r, include=FALSE}
+normalize = function(x){ #normalize function takes the mean and sd of the column
+  return((x - mean(x))/sd(x))
+}
+
+#function that will take a given dataframe and apply the normalize function
+#to every column in the data set, returning a new dataframe.
+standard <- function(df){
+  std_df <- df[1]
+  parsed <- df[2:dim(df)[2]]
+  for (i in 1:dim(parsed)[2]){
+    std_df <- cbind(std_df, (as.data.frame(normalize(parsed[,i]))))
+  }
+  return(std_df)
+}
+```
+
+```{r, include=FALSE}
+SDATA <- standard(DATA)                                                                    #standardize DATA
+colnames(SDATA)[2:401] = c(names_list)#rename the columns of the new SDATA dataframe
+
+colnames(DATA)[1] = c("TRUC") #rename the first column in the DATA
+colnames(SDATA)[1] = c("TRUC") #rename the first column in the SDATA
+
+SDATA$TRUC = as.factor(SDATA$TRUC) #Create first column as a factor
+DATA$TRUC = as.factor(DATA$TRUC)
+```
+The data that we are working with consists of a range of numbers between 0 to 255, a large scale to work from. Although we are able to work with the given data, applying a transformation or standardizing data is an approach to keep data consistent throughout the given data set and make the data more meaningful to the entire context. Like most circumstances, the data that we are presented with is not often normalized and can produce errors or hinder the performance of our model. Standardization is a key factor in doing algorithms such as K-Nearest Neighbors, Linear Regression, and other models using our data. 
+
+The following is the standardization formula that we will be using today applied with the data that we have. $Y_j = \frac{(X_j - m_j)}{S_j} \approx SDATA(n,j) = \frac{(DATA(n,j) - m_j)}{S_j}$ 
+
+Where:
+j - is the given column
+n - is the case given by row in the DATA dataframe
+$m_j$ - is the mean of that given column
+$S_j$  - is the standard deviation of the given j column
+DATA(n,j) - is the active data cell in the data set. 
+
+We will standardize our data around the mean of the column and standard deviation of that given column. As an output, our data is more uniform and can be used for our discretion. 
+
+# Part 2  
+## 2.1  
+```{r, include=FALSE}
+random_subset = function(data){ #function that randomly partitions data into train and test
+  CL1_sub = subset(data, TRUC == "CL1")
+  CL2_sub = subset(data, TRUC == "CL2")
+  CL3_sub = subset(data, TRUC == "CL3")
+  CL4_sub = subset(data, TRUC == "CL4")
+  #split the data to a training set for CL1 - CL4
+  CL1_smp <- initial_split(CL1_sub, prop = .8)
+  CL2_smp <- initial_split(CL2_sub, prop = .8)
+  CL3_smp <- initial_split(CL3_sub, prop = .8)
+  CL4_smp <- initial_split(CL4_sub, prop = .8)
+  #recombine into global training and test set
+  train_set <- rbind(training(CL1_smp),training(CL2_smp),training(CL3_smp),training(CL4_smp))
+  test_set <- rbind(testing(CL1_smp),testing(CL2_smp),testing(CL3_smp),testing(CL4_smp))
+  
+  return(list(train_set,test_set))
+}
+
+#function takes a standardized feature matrix and perturbes between -3% and +3%
+#Amplifies 2x by default
+perturb = function(sfdata){
+  set.seed(4)
+  rownum = c(1:nrow(sfdata))
+  sampled_rows = sample(nrow(sfdata),replace = TRUE)
+  for (i in sampled_rows) {
+    pert_factor = runif(1,.97,1.03) #random perturbation between -3 and +3 percent
+    pert_case = sfdata[i,]*pert_factor
+    sfdata = rbind(sfdata,pert_case)
+  }
+  return(sfdata)
+}
+```
+
+Separating into train/test 80/20.
+
+
+## 2.2  
+```{r, echo=FALSE}
+set.seed(3)
+S_split = random_subset(SDATA) #randomly partitioning data into train/test set
+
+train_S = S_split[[1]] #extracting training set
+
+### Amplify class CL1 training set by perturbation
+train_S_CL1 = subset(train_S, TRUC == "CL1")[-1]
+train_S = subset(train_S, TRUC != "CL1")
+train_S_CL1 = perturb(train_S_CL1)
+train_S_CL1 = cbind(TRUC = "CL1",train_S_CL1)
+train_S = rbind(train_S_CL1,train_S)
+
+### Amplify class CL1 test set by perturbation
+test_S = S_split[[2]]
+test_S_CL1 = subset(test_S, TRUC == "CL1")[-1]
+test_S = subset(test_S, TRUC != "CL1")
+test_S_CL1 = perturb(test_S_CL1)
+test_S_CL1 = cbind(TRUC = "CL1",test_S_CL1)
+test_S = rbind(test_S_CL1,test_S)
+```
+
+Amplification blah blah blah...
+
+The sizes of each class are as follows:  
+* CL1 training contains  `r round(nCL1*.8)` entries before amplification. After applying the perturbation amplification method, CL1 training contains `r nrow(train_S_CL1)` entries.
+* CL2 contains `r dim(subset(train_S,TRUC == "CL2"))[1]` entries (N2).  
+* CL3 contains `r dim(subset(train_S,TRUC == "CL3"))[1]` entries (N3).
+* CL4 contains `r dim(subset(train_S,TRUC == "CL4"))[1]` entries (N4).  
+* In total, there are `r nrow(train_S)` entries (N).
+
+* CL1 test contains  `r round(nCL1*.2)` entries before amplification. After applying the perturbation amplification method, CL1 training contains `r nrow(test_S_CL1)` entries.
+* CL2 contains `r dim(subset(test_S,TRUC == "CL2"))[1]` entries (N2).  
+* CL3 contains `r dim(subset(test_S,TRUC == "CL3"))[1]` entries (N3).
+* CL4 contains `r dim(subset(test_S,TRUC == "CL4"))[1]` entries (N4).  
+* In total, there are `r nrow(test_S)` entries (N).
+
+```{r, echo=FALSE}
+set.seed(3) #set a seed for reproducability
+
+k <- c(5,10,15,20,30,40,50) #define k-values to be used
+train_perf <- c() #intialize empty vector to store training performance
+test_perf <- c() #intialize empty vector to store testing performance
+
+start_time = Sys.time() #log start time
+
+for (i in 1:length(k)){ #iterate through each k-value.
+  #Apply knn algorithm to training set
+  train_perf[i] <- sum(train_S[,1] == knn(train_S[2:401], train_S[2:401], train_S[,1], k = k[i])) / nrow(train_S[1])
+  #Apply knn algorithm to test set
+  test_perf[i] <- sum(test_S[,1] == knn(train_S[2:401], test_S[2:401], train_S[,1], k = k[i])) / nrow(test_S[1])
+}
+end_time = Sys.time() #log end time
+
+accuracy_df <- cbind(train_perf, test_perf, k) #store accuracy and k-values
+accuracy_df <- as.data.frame(accuracy_df) #convert to dataframe
+computing_duration = end_time - start_time #calculate computation time
+
+print(computing_duration) #display computation time
+
+#plot accuracy of training and test accuracy vs. k-value
+ggplot(accuracy_df, aes(k)) +
+  geom_line(aes(y = train_perf*100, color = "Training Set")) + 
+  geom_point(aes(y = train_perf*100),shape = 15) + 
+  labs(title = "kNN Classification Accuracy",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  geom_line(aes(y = test_perf*100, color = "Test Set")) + 
+  geom_point(aes(y = test_perf*100),shape = 16) +
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue"))
+
+
+```
+Best range of k is 10 - 20. interpretation blah blah blah.
+
+## 2.3  
+```{r, echo=FALSE}
+set.seed(3) #set seed for reproducability
+k <- c(8:22) #define k-values to be used
+train_perf <- c() #intialize empty vector to store training performance
+test_perf <- c() #intialize empty vector to store testing performance
+
+start_time = Sys.time() #log start time
+for (i in 1:length(k)){ #same operation as section 2.2
+  train_perf[i] <- sum(train_S[,1] == knn(train_S[2:401], train_S[2:401], train_S[,1], k = k[i])) / nrow(train_S[1])
+  test_perf[i] <- sum(test_S[,1] == knn(train_S[2:401], test_S[2:401], train_S[,1], k = k[i])) / nrow(test_S[1])
+}
+end_time = Sys.time() #log end time
+
+#calculate standard error
+testmargin = sqrt(test_perf*(1-test_perf)/nrow(test_S))
+test_t = 1.6 #use t-statistic = 1.6
+upper_margin = test_perf+test_t*testmargin #calculate upper margin of 90% CI
+lower_margin = test_perf-test_t*testmargin #calculate lower margin of 90% CI
+
+accuracy_df <- cbind(train_perf, test_perf, k) #store results from kNN
+accuracy_df <- as.data.frame(accuracy_df) #convert to dataframe
+
+computing_duration = end_time - start_time #calculate computation time
+print(computing_duration) #display compuation time
+
+#create a plot of accuracy models for train and test with the CI of the test
+ggplot(accuracy_df, aes(k)) +
+  geom_ribbon(aes(ymin = upper_margin*100, ymax = lower_margin*100), fill = "lightblue")+
+  geom_line(aes(y = train_perf*100, color = "Training Set")) + 
+  geom_point(aes(y = train_perf*100),shape = 15) + 
+  geom_line(aes(y = test_perf*100, color = "Test Set")) + 
+  geom_point(aes(y = test_perf*100),shape = 16) +
+  labs(title = "kNN Classification Accuracy (90% CI)",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue")) +
+  scale_x_continuous(breaks = k) + ylim(60,75)
+
+ggplot(accuracy_df, aes(k)) +
+  geom_ribbon(aes(ymin = (test_perf - testmargin)*100, 
+                  ymax = (test_perf + testmargin)*100), fill = "lightblue")+
+  geom_line(aes(y = train_perf*100, color = "Training Set")) + 
+  geom_point(aes(y = train_perf*100),shape = 15) + 
+  geom_line(aes(y = test_perf*100, color = "Test Set")) + 
+  geom_point(aes(y = test_perf*100),shape = 16) +
+  labs(title = "kNN Classification Accuracy (SE)",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue")) +
+  scale_x_continuous(breaks = k) + ylim(60,75)
+```
+
+Best(k*) = 15.
+
+Train performance for k = 15: `r round(train_perf[8]*100,1)`%.
+Test performance for k = 15 with a 90% CI is:`r round(lower_margin[8]*100,1)` <= `r round(test_perf[8]*100,1)` <= `r round(upper_margin[8]*100,1)`.
+
+From the above kNN classification accuracy test was computed based on a 90% confidence interval for testperfk when k= k*. The team tested iteratively using the multiple k-values range from 10 to 20, and the percent accuracy was calculated for each iteration. Significant differences in model accuracy are observed between the training and test data sets. The best performance overall was given by k = 15, with 71.8% test set accuracy and 69% training set accuracy. However, the best performance for the training set was given by k = 10 with 72.7% accuracy; this value of k gave the worst performance for the test set with 65.3% accuracy. Therefore, using the best k value from the training data will not always give the best performance in the test set.
+
+## 2.4  
+```{r, echo = FALSE}
+set.seed(3) #set seed for reproducability
+#get the KNN model for training at k = 15
+training_matrix <- knn(train_S[2:401], train_S[2:401], train_S[,1], k = 15)
+#assign a table to the model and the predictors.
+confusion_table_train <- table(training_matrix,train_S[,1])                                              
+#create a prop table that will round the percents of factors based on rows
+round(prop.table(confusion_table_train, 1),2)*100                 
+
+#get the KNN model for testing at k = 15
+testing_matrix <- knn(train_S[2:401], test_S[2:401], train_S[,1], k = 15)           
+confusion_table_test <- table(testing_matrix,test_S[,1])                         
+round(prop.table(confusion_table_test, 1),2)*100
+
+testmargin_1 = sqrt(test_perf*(1-test_perf)/nrow(test_S$TRUC == CL1))
+testmargin_2 = sqrt(test_perf*(1-test_perf)/nrow(test_S$TRUC == CL2))
+testmargin_3 = sqrt(test_perf*(1-test_perf)/nrow(test_S$TRUC == CL3))
+testmargin_4 = sqrt(test_perf*(1-test_perf)/nrow(test_S$TRUC == CL4))
+```
+
+```{r, include=FALSE}
+
+
+
+```
+For testing set, 90% CI for correct classifications:  
+* CL1: `r round(prop.table(confusion_table_test, 1)[1,1] - test_t*testmargin_1[8],3)*100` - `r round(prop.table(confusion_table_test, 1)[1,1] + test_t*testmargin_1[8],3)*100`
+* CL2: `r round(prop.table(confusion_table_test, 1)[2,2] - test_t*testmargin_2[8],3)*100` - `r round(prop.table(confusion_table_test, 1)[2,2] + test_t*testmargin_2[8],3)*100`
+* CL3: `r round(prop.table(confusion_table_test, 1)[3,3] - test_t*testmargin_3[8],3)*100` - `r round(prop.table(confusion_table_test, 1)[3,3] + test_t*testmargin_3[8],3)*100`
+* CL4: `r round(prop.table(confusion_table_test, 1)[4,4] - test_t*testmargin_4[8],3)*100` - `r round(prop.table(confusion_table_test, 1)[4,4] + test_t*testmargin_4[8],3)*100`
+
+In this section, the k-Nearest Neighbor (kNN) automatic classification algorithm will be applied to the auto data set. The kNN algorithm is a supervised automatic classification algorithm that produces a categorization model based on input training data. The algorithm uses the distance between points to classify or categorize points into pre-defined classes or groups. A range of k-values was tested to determine the k-value that offers the best performance. Performance is measured using percent accuracy. In general, lower values of k (<10) produced the best results. The algorithm was also tested with and without the use of standardization (normalization) of feature variables. The performance of kNN using normalized and un-normalized data is discussed in a later section of this report. In selecting k, it is worth noting that high k-values tend to result in model “overfit”. This means that the model performance is good when applied to the training set, but poor when applied to the test set or a new un-tested data set. Higher k-values force the model to classify based on a pool of training data that is too large.
+As with the use of any model, there are benefits and drawbacks. The kNN algorithm is fast, simple, and can produce a relatively high percent of correct classifications without the need for tedious model training and parameter-fitting. The algorithm and close variations of it can be used for both classification and regression tasks, and its applications are broad. One drawback of the kNN algorithm is the complexity introduced by many feature variables. For this data set with only five features, however, kNN is adequate as an automatic classification algorithm.
+First, every case was labeled with its true classification (CL1, CL2, CL3, CL4) by appending a label column to each subset. Next, the subsets were randomly split into training and test subsets; the 80%/20% heuristic for training/test set size was used. Finally, the eight subsets (four training, four test) were re-grouped into a global training set and a global test set. Following this random partitioning and recombination, set size and composition is outlined below:
+Training Set Size: ? cases - 79.85% of total
+o CL1: ?  cases
+o CL2: ? cases
+o CL3:  ? cases
+o CL4: ?  cases
+ 
+Test Set Size: ? cases - 20.15% of total
+o CL1: ? cases
+o CL2: ? cases
+o CL3: ? cases
+o CL4: ? cases
+The confusion matrix for k-value equal to 15 is described below. The classes on the top horizontal are the predicted classes, the classes on the left vertical are actual classes. Diagonal entries are correctly classified cases.
+Example (training set): 68% of CL2 cases were correctly classified as CL2. 0% of CL2 cases were incorrectly classified as CL1.
+
+
+```{r, echo = FALSE}
+#function to input any category selected for errors
+#finds the selected errors in a dataframe.   
+error_list <- function(List,predict_list, cat1, cat2){           
+  Error_table <- cbind(List[1], predict_list, List[2:401])
+  Error_table <- Error_table[which(Error_table[1] != Error_table[2] & Error_table[1] == cat1 & Error_table[2] == cat2),]
+  return(Error_table)
+}
+
+#formula to preform distance from a given point to all other points in a given dataset
+K_distance <- function(point, data){
+  dist <- c()
+  for (i in 1:dim(data)[1]){
+    #use dist function to find distance between two points
+    distance <- round(dist(rbind(point[3:402], data[i,2:401])),2)
+    if (data[i,1] == "CL1"){
+      cl <- 1
+    }
+    else if (data[i,1] == "CL2"){
+      cl <- 2
+    }
+    else if (data[i,1] == "CL3"){
+      cl <- 3
+    }
+    else if(data[i,1] == "CL4"){
+      cl <- 4
+    }
+    point_distance <- cbind(i , distance, cl) 
+    dist <- rbind(dist, point_distance)
+  }
+  return(dist)#return a table of distances of that point to all points
+}
+```
+
+## 2.5  
+```{r, echo = FALSE}
+PredC <- testing_matrix  #defining matrix of predicted classes
+
+#combine the test set with the predicted vector but as the second column
+Error_table <- cbind(test_S[1], PredC, test_S[2:401])        
+
+#using function error list, return a list of errors, return a list of errors, class 2 but predicted class 1
+errors21 <- error_list(test_S, PredC, "CL2", "CL1")
+#select a random point of error that we may want to use
+selected21 <- errors21[sample(nrow(errors21), 1), ]
+#find the distance between that point and all the data in the train dataset 
+KNN_select21 <- K_distance(selected21, train_S)
+#sort the distances to obtain the nearest 15 points
+KNN_select21 <- KNN_select21[order(KNN_select21[,2]),]
+head(KNN_select21,15)
+
+errors23 <- error_list(test_S, PredC, "CL2", "CL3")
+#select a random point of error that we may want to use
+selected23 <- errors23[sample(nrow(errors23), 1), ]
+#find the distance between that point and all the data in the train dataset 
+KNN_select23 <- K_distance(selected23, train_S)
+#sort the distances to obtain the nearest 15 points
+KNN_select23 <- KNN_select23[order(KNN_select23[,2]),]
+head(KNN_select23,15)
+
+errors24 <- error_list(test_S, PredC, "CL2", "CL4")
+selected24 <- errors24[sample(nrow(errors24), 1), ]
+KNN_select24 <- K_distance(selected24, train_S)
+KNN_select24 <- KNN_select24[order(KNN_select24[,2]),]
+head(KNN_select24,15)
+```
+The point that was selected was class 2 but misclassified as class 1 was of point `r as.numeric(rownames(selected21))`. If we use our best K value from the K-nearest Neighbors test of 15, we are able to see the nearest distances to this point. With the distance, it had come out to the count of 6 CL1, 2 CL2, 3 CL3, and 4 CL4. The majority of the classes here come from the misclassified class CL1 and the least amount of class if that of CL2. One possible reason that this point is misclassified is that of noise where this data point is located. There are several classes that are shown to be present in this area and that is the possibility of this point being misclassified. When we compare this confusion matrix that is seen above, we see that the error of class 2 (Actual) to class 1 (predicted) is minimal with only .01 or 6 total points that fall under this misclassification. As a result, it is reasonable to say that this point was misclassified due to the noise that was around the point.
+
+The point that was selected was class 2 but misclassified as class 3 was of point `r as.numeric(rownames(selected23))`. Using the best K value from the K-nearest Neighbors of 17, we are able to see the nearest distances to this point. Within the distance, it had come out to 7 of CL2, 7 of CL3, and 1 of CL4. If we look at the resulting classes of the 15 nearest distance points, the majority of the same classes come from CL2 and CL3 equally at 7 each. One possible misclassification of this point is the random tie-breaker that the algorithm and R chooses to classify this point as. There are a few possible solutions for this problem in the model including decreasing or increasing K to the next value that will break the tie breaker, randomly select the class, using the partial sum of distance of some features in the data, or have weighted data points that gives more significance to points that are closer to the given point like a weighted KNN model over the normal voting model. 
+
+If we change our K value to be one less or one more, the result is that the point would be reclassified as the correct target class of CL2. The 16th nearest point is of class 2, which will break the tie breaker for CL2. If we were to remove the 15th nearest point, there would be one less CL3, breaking our tie breaker for CL2. Perhaps this point was misclassified due to the generalization of the entire model to be k = 15. 
+
+The point that was selected was class 2 but misclassified as class 4 was of point `r as.numeric(rownames(selected23))`. Using the best K value of 15 from the K-nearest Neighbors test, we are able get the distance between the point and the points in the training set. The 15 closest points came out to 2 of CL1, 5 of CL2, 3 of CL3 and class 4. If we look at the resulting classes of the 15 nearest distance points, the majority of the same classes that come from CL4 and CL2 are the next frequent class.  If we consider expanding and raising the K value to 19, the result is that the correct classification of CL2. The possible reason for the misclassification of this point was given from the noise of class 4 in the area of this point. A larger K value would have not created this point to be misclassified but would possibly have created other points to be misclassified. 
+
+
+# Part 3  
+## 3.1  
+```{r, echo=FALSE}
+#calculating eigenvectors/values of 400x400 correlation matrix
+corr_ev = eigen(corr_matrix_full) 
+L_values = corr_ev$values #storing eigenvalues
+W_vectors = corr_ev$vectors #storing eigenvectros
+#create 400x400 eigenvector matrix as csv file
+write.csv(W_vectors,"C:\\Users\\basel\\OneDrive\\MSDS FA 2021\\6350 - Stat Learn & Data Mining\\HW\\Eigenvectors.csv", row.names = FALSE)
+
+#plot eigenvalue vs index
+qplot(seq_along(L_values),L_values) + 
+  labs(title = "Eigenvalues of Feature Correlation Matrix",x="Index",y="Eigenvalue") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(0,60,10),limits = c(0,60))
+```
+Figure x.x displays the eigenvalues of the 400x400 feature correlation matrix.
+
+## 3.2  
+```{r, echo=FALSE}
+PEV = cumsum(L_values/length(L_values))*100 #taking cumulative sum of eigenvalues divided by 400
+PEV_opt = which.min(abs(PEV - 90)) + 1 #finding optimum % explained variance 
+
+#plot PEV vs. index
+qplot(seq_along(PEV),PEV) + 
+  labs(title = "Percentage of Explained Variance" , x="Index" , y="PEV (%)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(0,100,10),limits = c(0,100)) + 
+  scale_x_continuous(breaks = c(seq(0,400,100),PEV_opt),limits = c(0,400)) +
+  geom_vline(xintercept = PEV_opt, color = "red", linetype = "dashed",size = 1) +
+  geom_hline(yintercept = 90, color = "black", linetype = "solid",size = .01)
+```
+90% of the variance is explained by the first 63 principle components (r=63).
+
+```{r, echo= FALSE}
+#taking feature matrix from standardized data
+SDATA_features = SDATA[,-1]
+W_vectors_opt = W_vectors[,1:PEV_opt]
+
+#Creating 63 feature length ZDATA matrix from PCA
+ZDATA = c()
+
+for (case in 1:nrow(SDATA_features)){ #1 to 2023 rows
+  case_pc = c()
+  case_feature = unlist(SDATA_features[case,])
+  for (pc in 1:dim(W_vectors_opt)[2]){ #1 to 63 columns
+    case_pc[pc] = W_vectors_opt[,pc] %*% case_feature
+}
+  ZDATA = rbind(ZDATA,case_pc)
+}
+
+ZDATA = as.data.frame(ZDATA)
+ZDATA = cbind(SDATA$TRUC,ZDATA,stringsAsFactors = TRUE)
+
+colnames(ZDATA) = c("TRUC",paste0("PC",1:PEV_opt))
+rownames(ZDATA) = c(1:nrow(ZDATA))
+dim(ZDATA)
+ZDATA_disp = cbind(ZDATA[1],round(ZDATA[2:6],1))
+ZDATA_disp = ZDATA_disp %>% 
+   group_by(TRUC) %>% 
+   slice(head(row_number(), 2))
+ZDATA_disp #ZDATA display as an example
+```
+
+## 3.4  
+```{r, echo=FALSE}
+set.seed(4) #setting random seed for reproducibility
+
+Z_split = random_subset(ZDATA) #randomly subsetting into train/test splits
+
+train_Z = Z_split[[1]] #defining training split
+
+train_Z_CL1_original = subset(train_Z, TRUC == "CL1") #subset of original CL1 training data
+train_Z = subset(train_Z, TRUC != "CL1") #subset of non-CL1 training data
+
+train_Z_CL1 = train_Z_CL1_original[-1] #removing "TRUC" column 
+train_Z_CL1 = perturb(train_Z_CL1) #perturbing data in CL1 training set
+train_Z_CL1 = cbind(TRUC = "CL1",train_Z_CL1) #adding "TRUC" column 
+train_Z = rbind(train_Z_CL1,train_Z) #re-combining into global training set.
+
+
+train_Z_CL1_synth = train_Z_CL1[-1:-nrow(train_Z_CL1_original),] #subsetting synthetic data
+train_Z_CL1_synth$TRUC = as.factor("Synthetic") #labelling synthetic data
+train_Z_CL1_original$TRUC = as.factor("Original") #labelling original data
+train_Z_CL1 = rbind(train_Z_CL1_original,train_Z_CL1_synth) #re-combinining 
+
+test_Z = Z_split[[2]] #defining test split
+
+test_Z_CL1_original = subset(test_Z, TRUC == "CL1") #subset of original CL1 testing data
+test_Z = subset(test_Z, TRUC != "CL1") #subset of non-CL1 testing data
+
+test_Z_CL1 = test_Z_CL1_original[-1] #removing "TRUC" column 
+test_Z_CL1 = perturb(test_Z_CL1) #perturbing data in CL1 testing set
+test_Z_CL1 = cbind(TRUC = "CL1",test_Z_CL1) #adding "TRUC" column 
+test_Z = rbind(test_Z_CL1,test_Z) #re-combining into global testing set.
+
+test_Z_CL1_synth = test_Z_CL1[-1:-nrow(test_Z_CL1_original),] #subsetting synthetic data
+test_Z_CL1_synth$TRUC = as.factor("Synthetic") #labelling synthetic data
+test_Z_CL1_original$TRUC = as.factor("Original") #labelling original data
+test_Z_CL1 = rbind(test_Z_CL1_original,test_Z_CL1_synth) #re-combinining 
+
+
+ggplot(train_Z_CL1,aes(x = PC1, y =PC2, color = factor(TRUC))) + 
+  geom_point(aes(shape = factor(TRUC),size = factor(TRUC))) +  
+  scale_color_manual(values=c("deeppink", "turquoise2"), name = "CL1 Train Set") + 
+  scale_shape_manual(values=c(1,3), name = "CL1 Train Set") + 
+  scale_size_manual(values = c(2,2),name="CL1 Train Set") + 
+  labs(title = "Amplification of CL1 (Train Set)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(test_Z_CL1,aes(x = PC1, y =PC2, color = factor(TRUC))) + 
+  geom_point(aes(shape = factor(TRUC),size = factor(TRUC))) +  
+  scale_color_manual(values=c("deeppink", "turquoise3"), name = "CL1 Test Set") + 
+  scale_shape_manual(values=c(1,3), name = "CL1 Test Set") + 
+  scale_size_manual(values = c(2,2),name="CL1 Test Set") +
+  labs(title = "Amplification of CL1 (Test Set)") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r, echo = FALSE}
+#PCA
+set.seed(3) #set seed for reproducability
+
+k <- c(8:22) #set k-values
+train_perf <- c() #initialize train/test vectors
+test_perf <- c()
+
+start_time = Sys.time() #log start time
+for (i in 1:length(k)){ #apply kNN algorithm
+  train_perf[i] <- sum(train_Z[,1] == knn(train_Z[2:dim(train_Z)[2]], train_Z[2:dim(train_Z)[2]], train_Z[,1], k = k[i])) / nrow(train_Z[1])
+  test_perf[i] <- sum(test_Z[,1] == knn(train_Z[2:dim(train_Z)[2]], test_Z[2:dim(test_Z)[2]], train_Z[,1], k = k[i])) / nrow(test_Z[1])
+}
+end_time = Sys.time() #log end time
+
+### similar code as previous kNN implementations (see section 2) ###  
+accuracy_df_Z <- cbind(train_perf, test_perf, k)
+accuracy_df_Z <- as.data.frame(accuracy_df_Z)
+
+testmargin_Z = sqrt(test_perf*(1-test_perf)/length(test_S))
+
+test_t = 1.6
+
+upper_margin_Z = test_perf+test_t*testmargin_Z
+lower_margin_Z = test_perf-test_t*testmargin_Z
+
+computing_duration = end_time - start_time
+print(computing_duration)
+
+ggplot(accuracy_df, aes(k)) +
+  geom_ribbon(aes(ymin = upper_margin*100, ymax = lower_margin*100), fill = "lightblue")+
+  geom_line(aes(y = train_perf*100, color = "Training Set")) + 
+  geom_point(aes(y = train_perf*100),shape = 15) + 
+  geom_line(aes(y = test_perf*100, color = "Test Set")) + 
+  geom_point(aes(y = test_perf*100),shape = 16) +
+  labs(title = "kNN Classification Accuracy (Standard)",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue")) +
+  scale_x_continuous(breaks = k) + 
+  ylim(55,80)
+
+ggplot(accuracy_df_Z, aes(k)) +
+  geom_ribbon(aes(ymin = upper_margin_Z*100, ymax = lower_margin_Z*100), fill = "lightblue")+
+  geom_line(aes(y = train_perf*100, color = "Training Set")) + 
+  geom_point(aes(y = train_perf*100),shape = 15) + 
+  geom_line(aes(y = test_perf*100, color = "Test Set")) + 
+  geom_point(aes(y = test_perf*100),shape = 16) +
+  labs(title = "kNN Classification Accuracy (PCA)",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue")) +
+  scale_x_continuous(breaks = k) + 
+  ylim(55,80)
+```
+
+For k* = 15.
+
+Train performance for k = 15: `r round(train_perf[8]*100,2)`%.
+Test performance for k = 15 with a 90% CI is:`r round(lower_margin_Z[8]*100,1)` <= `r round(test_perf[8]*100,1)` <= `r round(upper_margin_Z[8]*100,1)`.
+
+As compared to 2.4.... copy old numbers
+
+
+
+```{r, echo=FALSE}
+#confusion matrix comparison for k = 20 w/ confidence intervals
+k <- 15
+
+train_perf <- knn(train_Z[2:dim(train_Z)[2]], train_Z[2:dim(train_Z)[2]], train_Z[,1], k = k)
+test_perf <- knn(train_Z[2:dim(train_Z)[2]], test_Z[2:dim(test_Z)[2]], train_Z[,1], k = k)
+
+training_matrix <- train_perf         #get the KNN model for training at k = 20
+confusion_table_train <- table(training_matrix,train_S[,1])                             #assign a table to the model and the predictors.                   
+
+round(prop.table(confusion_table_train, 1),2)*100                     #create a prop table that will ouput the percents of the factors based on the rows and round it
+
+testing_matrix <- test_perf           #get the KNN model for testing at k = 20
+confusion_table_test <- table(testing_matrix,test_S[,1])                         
+round(prop.table(confusion_table_test, 1),2)*100
+###comments about ZDATA vs SDATA confusion matrix.
+```
+Above is the confusion matrix for the k-value equal to 15, for the PCA performed data set. This confusion matrix is calculated from the PCA treated data set. The classes listed vertically are that of the actual class, the classes listed vertically are that of the predicted class. When comparing the confusion matrix of the PCA data and the non-PCA data, the performance of each class here along the diagonals tends to be reduced and or performed worse than that of the standardized data.  Although we are getting data performance that is worse, that is expected when we are working with data that has been treated with PCA. In our PCA data, we are only using 90% of the variance in the model, when compared to the original data that captures the entire dataset and all of the variance in the model. Losing the 10% of the variance produces a model that does not perform as well as one that captures all the data but is still expected to produce a model that is similar to what we had before. When we just look at the overall accuracy of the model, the same concept of the non PCA treated data leads to higher direct accuracy of the model for both the train and test.
+
+
+Computing time + computer specs blah blah blah
+
+## 3.5  
+```{r, echo=FALSE}
+#CL1 = red
+#CL2 = blue
+#CL3 = green
+#CL4 = brown
+
+CL1_Zsub = subset(ZDATA, TRUC == "CL1")[1:3]
+CL2_Zsub = subset(ZDATA, TRUC == "CL2")[1:3]
+CL3_Zsub = subset(ZDATA, TRUC == "CL3")[1:3]
+CL4_Zsub = subset(ZDATA, TRUC == "CL4")[1:3]
+
+names(CL1_Zsub)[1] = "CLASS"
+names(CL2_Zsub)[1] = "CLASS"
+names(CL3_Zsub)[1] = "CLASS"
+names(CL4_Zsub)[1] = "CLASS"
+
+CL12_Zsub = rbind(CL1_Zsub,CL2_Zsub)
+CL13_Zsub = rbind(CL1_Zsub,CL3_Zsub)
+CL14_Zsub = rbind(CL1_Zsub,CL4_Zsub)
+CL23_Zsub = rbind(CL2_Zsub,CL3_Zsub)
+CL24_Zsub = rbind(CL2_Zsub,CL4_Zsub)
+CL34_Zsub = rbind(CL3_Zsub,CL4_Zsub)
+
+ggplot(CL12_Zsub,aes(x = PC1, y =PC2, color = factor(CLASS))) + geom_point() + 
+  scale_color_manual(values=c("red", "blue"),name = "Legend") + 
+  labs(title = "Comparison of CL2 and CL1") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(CL23_Zsub,aes(x = PC1, y =PC2, color = factor(CLASS))) + geom_point() + 
+  scale_color_manual(values=c("blue", "springgreen2"),name = "Legend") + 
+  labs(title = "Comparison of CL2 and CL3") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(CL24_Zsub,aes(x = PC1, y =PC2, color = factor(CLASS))) + geom_point() + 
+  scale_color_manual(values=c("blue", "sienna3"),name = "Legend") + 
+  labs(title = "Comparison of CL2 and CL4") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+CL1 = red
+CL2 = blue
+CL3 = green
+CL4 = brown
+
+Note that this does not show amplified CL1 data.
+
+The main goal of this section was to evaluate visually if these planar projections on the same planar graph on the scatter plot of CL2 cases (blue) against the CL1 (red), CL3 (green), and CL4 (brown) cases in four different colors are easily separated or not. In the first comparison of CL2 and CL1, we can conclude that it was well separated between CL2 and CL1. The second comparison of CL2 and CL3 visually does not appear to be well separated compared to the CL2 and CL1. Lastly, the comparison of CL2 and CL4 is visually similar to the comparison of CL2 and CL3, which is also not well separated.
+
+## 3.6  
+```{r, echo=FALSE}
+error_list2 <- function(List,predict_list, cat1, cat2){           #function to input any category selected for errors   
+  Error_table <- cbind(List[1], predict_list, List[2:64])
+  Error_table <- Error_table[which(Error_table[1] != Error_table[2] & Error_table[1] == cat1 & Error_table[2] == cat2),]
+  return(Error_table)
+}
+```
+
+```{r, echo = FALSE}
+#combine the test set with the predicted vector but as the second column
+Error_table <- cbind(test_Z[1], PredC, test_Z[2:64])      
+
+# see if we increase K how much does the total amount of class changes. do we end up with the right class after more ks are added
+
+errors21_Z <- error_list2(test_Z, PredC, "CL2", "CL1")[2:4]
+errors23_Z <- error_list2(test_Z, PredC, "CL2", "CL3")[2:4]
+errors24_Z <- error_list2(test_Z, PredC, "CL2", "CL4")[2:4]
+
+names(errors21_Z)[1] = "CLASS"
+names(errors23_Z)[1] = "CLASS"
+names(errors24_Z)[1] = "CLASS"
+```
+
+```{r, echo = FALSE}
+#CL1 = red
+#CL2 = blue
+#CL3 = green
+#CL4 = brown
+CL2_Zsub_err = rbind(CL2_Zsub,errors21_Z,errors23_Z,errors24_Z)
+
+ggplot(CL2_Zsub_err,aes(x = PC1, y =PC2, color = factor(CLASS))) + 
+  geom_point(aes(shape = factor(CLASS),color = factor(CLASS),size = factor(CLASS))) + 
+  scale_color_manual(values=c("red", "blue", "springgreen2", "sienna3"),name = "Legend") + 
+  scale_shape_manual(values=c(15,20,16,17),name = "Legend")+
+  scale_size_manual(values=c(2.5,1.7,2.5,2.5),name = "Legend") + 
+  labs(title = "Misclassifications of CL2") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+In part 3.6, the team displayed the planar projection of CL2 as a blue color, CL1 as a red color, CL3 as a green color, and CL4 as a brown color. The CL1, CL3, and CL4 colors were used to isolate all misclassified points listed in ERR21, ERR23, and ERR24. On graph 1, it appears that 5 are incorrectly classified as CL1. The second graph for CL2 and CL3 appears to be 10 are misclassified as CL3. Lastly, graphs CL2 and CL4 come out to be 11 misclassified points. All the misclassified points listed in ERR21, ERR23, and ERR24 should be classified as CL2. 

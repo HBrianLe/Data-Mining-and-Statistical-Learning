@@ -1,0 +1,791 @@
+---
+title: "6350_HW1_v1"
+author: "Brian Le, Basel Najjar, Soo Jong Cho"
+date: "9/12/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE, error=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("ggplot2")
+#install.packages("lattice")
+#install.packages("knitr")
+#install.packages("rsample")
+#install.packages("caret")
+#install.packages("patchwork")
+library(ggplot2)
+library(lattice)
+library(knitr)
+library(rsample)
+library(caret)
+library(class)
+library(patchwork)
+```
+
+# I. Scope
+This report outlines the analysis of a data set containing vehicle performance information. Exploratory analysis of this data set was completed using basic descriptive statistics and graphing tools. In addition, an automatic classification model was developed using the k Nearest Neighbor (kNN) algorithm. After removing entries containing missing data and eliminating categorical features, this data set contains 392 observation with 5 features and 1 response variable.  
+
+The response variable of this data set is:  
+* MPG - Miles per Gallon
+
+The features of this data set are:  
+* Cylinders - Number of Cylinders   
+* Displacement - Engine Displacement (Cubic inches)  
+* Horsepower - Engine Horsepower  
+* Weight - Vehicle Weight (lbs)  
+* Acceleration - Time to Accelerate from 0 to 60 mph (sec.)  
+
+Several variables were eliminated from this analysis due to their irrelevance in description and/or prediction. These variables include:  
+* Year - Model Year (modulo 100)  
+* Origin - National Origin of Vehicle (1. American, 2. European, 3. Japanese)  
+* Name - Vehicle Make/Model 
+
+```{r, include= FALSE}
+#Importing cleaned CSV file as a dataframe called "auto"
+auto = read.csv("C:\\Users\\basel\\OneDrive\\MSDS FA 2021\\6350 - Stat Learn & Data Mining\\HW\\DataAuto.csv") 
+auto_features = auto[2:6]
+
+Y = auto$mpg #declare response variable MPG as "Y"
+# Declaration of all feature variables Fi (i=1 to 5)
+F1 = auto$cyl
+F2 = auto$displacement
+F3 = auto$horsepower
+F4 = auto$weight
+F5 = auto$acceleration
+```
+
+# II. Preliminary Statistical Data Analysis  
+## 1. Basic Descriptive Statistics  
+### Response Variable (Y) - Miles per Gallon  
+```{r, include=FALSE}
+mY = mean(Y)
+stdY = sd(Y)
+rangeY = range(Y)
+```
+The mean of the response variable Y (vehicle fuel economy measured by miles per gallon) is `r round(mY,1)` mpg.
+The standard deviation of Y is `r round(stdY,1)` mpg.
+The minimum value of response variable Y is `r rangeY[1]` mpg and the maximum value is `r rangeY[2]` mpg. The range is `r rangeY[2] - rangeY[1]` mpg.  
+
+### Feature Variable 1 (F1) - Number of Cylinders
+```{r, include=FALSE}
+mF1 = mean(F1)
+medF1 = median(F1)
+stdF1 = sd(F1)
+rangeF1 = range(F1)
+```
+The mean of feature variable F1 (number of cylinders) is `r round(mF1,1)` cylinders However, it should be noted that feature F1 is a discrete variable with integer values (the number of cylinders in a vehicle engine is a whole number). The median of F1 is `r medF1` cylinders.
+The standard deviation of F1 is `r round(stdF1,1)` cylinders.
+The minimum value of feature variable F1 is `r rangeF1[1]` cylinders and the maximum value is `r rangeF1[2]` cylinders. The range is `r rangeF1[2] - rangeF1[1]` cylinders.  
+
+### Feature Variable 2 (F2) - Engine Displacement (Cubic inches)
+```{r, include=FALSE}
+mF2 = mean(F2)
+stdF2 = sd(F2)
+rangeF2 = range(F2)
+```
+The mean of feature variable F2 (engine displacement measured in cubic inches) is `r round(mF2,1)` in^3^.
+The standard deviation of F2 is `r round(stdF2,1)` in^3^.
+The minimum value of feature variable F2 is `r rangeF2[1]` in^3^ and the maximum value is `r rangeF2[2]` in^3^. The range is `r rangeF2[2] - rangeF2[1]` in^3^.  
+
+### Feature Variable 3 (F3) - Engine Horsepower (hp)
+```{r, include=FALSE}
+mF3 = mean(F3)
+stdF3 = sd(F3)
+rangeF3 = range(F3)
+```
+The mean of feature variable F3 (engine power output measured in horsepower) is `r round(mF3,1)` hp.
+The standard deviation of F2 is `r round(stdF3,1)` hp.
+The minimum value of feature variable F3 is `r rangeF3[1]` hp and the maximum value is `r rangeF3[2]` hp. The range is `r rangeF3[2] - rangeF3[1]` hp.  
+
+### Feature Variable 4 (F4) - Vehicle Weight (lb)
+```{r, include=FALSE}
+mF4 = mean(F4)
+stdF4 = sd(F4)
+rangeF4 = range(F4)
+```
+The mean of feature variable F4 (vehicle weight measured in pounds) is `r round(mF4,1)` lb.
+The standard deviation of F2 is `r round(stdF4,1)` lb.
+The minimum value of feature variable F4 is `r rangeF4[1]` lb and the maximum value is `r rangeF4[2]`. The range is `r rangeF4[2] - rangeF4[1]` lb.  
+
+### Feature Variable 5 (F5) - Vehicle Acceleration (seconds)
+```{r, include=FALSE}
+mF5 = mean(F5)
+stdF5 = sd(F5)
+rangeF5 = range(F5)
+```
+The mean of feature variable F5 (vehicle acceleration measured in time from 0 to 60 mph in seconds) is `r round(mF5,1)` s.
+The standard deviation of F2 is `r round(stdF5,1)` s.
+The minimum value of feature variable F5 is `r rangeF5[1]` s and the maximum value is `r rangeF5[2]` s. The range is `r rangeF5[2] - rangeF5[1]` s.  
+
+## 2. Graphical Description of Variables  
+### Response Variable (Y) - Miles per Gallon  
+```{r, echo=FALSE}
+Y_hist = ggplot(auto,aes(mpg)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdY)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of MPG")+ xlab("MPG")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+Y_pdf = ggplot(auto, aes(x=mpg)) + geom_density() +
+  geom_vline(xintercept = mY - stdY, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mY-1*stdY, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mY, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mY, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mY+stdY, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mY+1*stdY, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density of MPG")+ xlab("MPG")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+Y_hist + Y_pdf
+```  
+MPG is a right-skewed distribution. This histogram shows that a majority of cases appear between 10 and 30 MPG. In fact, `r round(nrow(subset(auto, mpg<30 & mpg>10))/nrow(auto)*100)`% of cases occur between 10 and 30 MPG. A similar conclusion can be drawn from the probability density plot of MPG. The PDF shows the same right skew with a relatively small standard deviation about the mean.  
+
+### Feature Variable 1 (F1) - Number of Cylinders
+
+```{r, echo=FALSE}
+F1_hist = ggplot(auto,aes(cylinders)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF1)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Cylinders")+ xlab("Number of Cylinders")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F1_pdf = ggplot(auto, aes(x=cylinders)) + geom_density() +
+  geom_vline(xintercept = mF1 - stdF1, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mF1-1*stdF1, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mF1, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mF1, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mF1+stdF1, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mF1+1*stdF1, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density of Cylinders")+ xlab("Cylinders")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+F1_hist + F1_pdf
+```
+
+Based on the histogram above, it is clear that the most common vehicle engine design on the market is a 4-cylinder engine, followed by the 8 and 6-cylinder designs. The probability density plot shows the same bias towards 4-cylinder engines, and also shows the relatively large spread about the mean. The number of cylinders is a discrete variable, so the curve represented by the PDF is somewhat misleading as only whole integer numbers are possible for this variable.  
+
+### Feature Variable 2 (F2) - Engine Displacement (Cubic inches)
+```{r, echo=FALSE}
+F2_hist = ggplot(auto,aes(displacement)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF2)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Displacement")+ xlab("Displacement")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F2_pdf = ggplot(auto, aes(x=displacement)) + geom_density() +
+  geom_vline(xintercept = mF2 - stdF2, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mF2-1*stdF2, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mF2, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mF2, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mF2+stdF2, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mF2+1*stdF2, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density of Displacement")+ xlab("Displacement")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+F2_hist + F2_pdf
+```
+Displacement shows a strong right skew with a peak around 100 in^3^. The PDF shows a similar peak slightly beyond 100 in^3^. Very few vehicle engines displace more than 400 in^3^ or less than 75 in^3^. 
+
+### Feature Variable 3 (F3) - Engine Horsepower (hp)
+```{r, echo=FALSE}
+F3_hist = ggplot(auto,aes(horsepower)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF3)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Horsepower")+ xlab("Horsepower")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F3_pdf = ggplot(auto, aes(x=horsepower)) + geom_density() +
+  geom_vline(xintercept = mF3 - stdF3, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mF3-1*stdF3, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mF3, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mF3, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mF3+stdF3, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mF3+1*stdF3, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density of Horsepower")+ xlab("Horsepower")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+F3_hist + F3_pdf
+```
+The distribution of horsepower is right-skewed. The histogram of horsepower shows that a majority of vehicles are rated at less than 125 hp. In fact, this represents approximately `r round(nrow(subset(auto, horsepower<125))/nrow(auto)*100)`% of cases. The probability density plot of horsepower also displays a slight bi-modality with a second, smaller peak around 150 hp.  
+
+### Feature Variable 4 (F4) - Vehicle Weight (lb)
+```{r, echo=FALSE}
+F4_hist = ggplot(auto,aes(weight)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF4)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Weight")+ xlab("Weight")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F4_pdf = ggplot(auto, aes(x=weight)) + geom_density() +
+  geom_vline(xintercept = mF4 - stdF4, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mF4-1*stdF4, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mF4, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mF4, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mF4+stdF4, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mF4+1*stdF4, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density of Weight")+ xlab("Weight")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F4_hist + F4_pdf
+```
+The distribution of weight is right-skewed. Both the histogram and PDF show a peak between 2,000 to 2,500 lb. Despite a concentration of vehicle weights in this range, there a relatively large standard deviation about the mean in this distribution. There are very few vehicles less than 2,000 lb or greater than 4,500 lb.  
+
+### Feature Variable 5 (F5) - Vehicle Acceleration (seconds)
+```{r, echo=FALSE}
+F5_hist = ggplot(auto,aes(acceleration)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF5)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of Acceleration")+ xlab("Acceleration")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))  
+F5_pdf = ggplot(auto, aes(x=acceleration)) + geom_density() +
+  geom_vline(xintercept = mF5 - stdF5, linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(x = mF5-1*stdF5, y = 0, label = "-1 SD")) +
+  geom_vline(xintercept = mF5, linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = mF5, y = 0, label = "Mean")) +
+  geom_vline(xintercept = mF5+stdF5, linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = mF5+1*stdF5, y = 0, label = "+1 SD")) + 
+  labs(title = "Probability Density Plot of Acceleration")+ xlab("s")+ylab("Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F5_hist + F5_pdf
+```
+
+Acceleration appears to be normally distributed in this data set, with a bell-shaped curve about the mean. As shown in the probability density plot, the mean sits very close to peak frequency. The standard deviation is relatively small and the curve is "tall and thin", as opposed to "short and wide", Clearly, the majority of vehicles are rated between 12 to 18 s acceleration. This range represents `r round(nrow(subset(auto, acceleration<18 & acceleration>12))/nrow(auto)*100)`% of cases. 
+
+## 3. Graphical Comparison of Variables  
+The following figures provide a visual comparison of the response variable (Y) with each feature variable (F1, ..., F5). In addition, the correlation coefficient for each of the five relationships (Y vs. F1, ..., Y vs. F5) is provided. It should be noted that the correlation coefficient only provides information about the linear relationship between variables. A pair of variables with a low correlation coefficient value (~ 0) may still exhibit a non-linear relationship.  
+
+```{r, echo = FALSE}
+plot(as.factor(F1),Y,main = "MPG vs. Number of Cylinders (F1)", xlab = "Number of Cylinders", ylab = "MPG")
+```
+Based on the boxplot of MPG vs. Cylinders, we can conclude that 4-cylinder engines achieve better fuel economy (higher MPG) than any other engine design. The vehicle with the highest fuel economy in the data set has 4 cylinders. 3-cylinder engines achieve relatively poor fuel economy with few outliers. As the number of cylinders increases beyond 4, vehicle fuel economy decreases in a somewhat linear fashion. 8-cylinder engines achieve the worst fuel economy of any engine design, and the vehicle with the lowest MPG rating in the data set has an 8-cylinder engine.  
+
+```{r, echo = FALSE}
+plot(F2,Y,main = "MPG vs. Displacement (F2)", xlab = "Displacement", ylab = "MPG")
+```
+The scatter plot displays a negative correlation between displacement and MPG. The relationship is non-linear at low displacement (high MPG) values with small changes in displacement causing significant changes in MPG. The relationship becomes increasingly linear for moderate displacement (moderate MPG) cases. For high displacement (low MPG) cases, there appears to be minimal effect of displacement on MPG.  
+
+```{r, echo = FALSE}
+plot(F3,Y,main = "MPG vs. Horsepower (F3)", xlab = "Horsepower", ylab = "MPG")
+```
+
+The scatter plot displays a negative correlation between horsepower and MPG. The relationship is non-linear at low horsepower (high MPG) values with small changes in horsepower causing significant changes in MPG. The relationship becomes increasingly linear for moderate horsepower (moderate MPG) cases. For high horsepower (low MPG) cases, there appears to be minimal effect of weight on MPG.  
+
+
+```{r, echo = FALSE}
+plot(F4,Y,main = "MPG vs. Weight (F4)", xlab = "Weight", ylab = "MPG")
+```
+
+The scatter plot displays a negative correlation between weight and MPG. The relationship appears to be non-linear at low horsepower (high MPG) values with small changes in horsepower causing significant changes in MPG. The relationship becomes increasingly linear for moderate horsepower (moderate MPG) cases. For high horsepower (low MPG) cases, there appears to be minimal effect of horsepower on MPG.  
+
+```{r, echo = FALSE}
+plot(F5,Y,main = "MPG vs. Acceleration (F5)", xlab = "Acceleration", ylab = "MPG")
+```
+The scatter plot displays a positive correlation between acceleration and MPG. The relationship appears to be linear for cases with low acceleration (low MPG). The relationship becomes less linear and less predictable for moderate and high acceleration cases. Acceleration does not appear to be an effective sole discriminator for MPG, as there is a wide variety of MPG ratings for vehicles with similar acceleration.
+
+
+```{r, echo=FALSE}
+cor_values = c(cor(F1,Y), cor(F2,Y), cor(F3,Y), cor(F4,Y), cor(F5,Y))
+names(cor_values) = c("MPG vs. Cylinders", "MPG vs. Displacement", "MPG vs. Horsepower", "MPG vs. Weight", "MPG vs. Acceleration")
+kable(cor_values, digits = 2, row.names = TRUE, col.names = "Correlation Coefficient Value", align = "c")
+```
+
+## 4. Feature Correlation Matrix  
+The following table represents the 5x5 correlation matrix. This outlines correlation coefficient values for all features compared to one another. The correlation coefficient describes the "strength" and "direction" of the linear relationship, with -1 describing a perfectly negative linear relationship, 0 describing no linear relationship, and +1 describing a perfectly positive linear relationship. It should be noted that variables whose coefficients are close to 0 may still exhibit a non-linear relationship.   
+```{r, echo = FALSE}
+names(auto_features) = c("Cylinders", "Displacement", "Horsepower", "Weight", "Acceleration")
+feature_cor = cor(auto_features)
+kable(feature_cor, digits = 2, row.names = TRUE, col.names = names(auto_features),align = "c")
+```  
+
+Based on the 5x5 feature correlation matrix, all features except for acceleration exhibit strong positive correlation. Acceleration shows a weaker negative relationship to all other features. The weakest correlation is between weight and acceleration (-0.42). The strongest is between cylinders and displacement (+0.95), and is nearly perfectly linear. Displacement measures the total volume that is displaced by the piston within the cylinders of the engine. Therefore, this relationship is not surprising. The weakest correlation among features (excluding acceleration) is between horsepower and cylinders (0.84) 
+
+In the context of automatic classification, a strong relationship (either positive or negative) between feature variables typically indicates that these features are interchangeable or redundant. Several methods exist in the literature and in practice for eliminating unnecessary features. One commonly used method is principle component analysis (PCA). Discussion and implementation of PCA or other dimensionality reduction methods is beyond the scope of this report.  
+
+
+## 5. Response Variable Quantile Curve  
+The quantile curve of the response variable shows the 25%, median (50%), and 75% quantiles for MPG.  
+```{r, echo=FALSE}
+ggplot(auto,aes(mpg)) + stat_ecdf(geom = "point") + labs(title = "Quantile Curve of MPG", x = "MPG" ,y = "Quantile") + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  geom_vline(xintercept = quantile(Y,.25), linetype = "dashed", color = "chartreuse4", size = 1) +
+  geom_text(aes(quantile(Y,.32), y = 0, label = "Q25%")) +
+  geom_vline(xintercept = quantile(Y,.5), linetype = "solid", color = "red", size = 1) +
+  geom_text(aes(x = quantile(Y,.55), y = 0, label = "Median")) +
+  geom_vline(xintercept = quantile(Y,.75), linetype = "dotdash", color = "blue", size = 1) +
+  geom_text(aes(x = quantile(Y,.79), y = 0, label = "Q75%")) + 
+  coord_flip()
+
+```
+## 6. Linear Regression Models
+### Summary of Regression Parameters  
+The table below outlines key linear regression parameters for each feature variable (F1, ..., F5) vs. the response variable (Y).  
+* Slope represents the rate of change in the value of MPG for a unit change in the value of the feature. 
+* Intercept represents the MPG value for a feature variable value set to zero; the interpretation of the intercept is meaningless in many real-world examples (including this one) and serves to adjust the "starting point" for the slope in the regression model. 
+* RMSE is the root mean squared error and represents the square root of the sum of distances between each actual value and the regression line divided by degrees of freedom (in this case n-2, where n represents the number of cases). This is essentially the average model prediction error.
+* Relative accuracy represents the RMSE divided by the mean of response variable Y. This re-scales RMSE to the scale of Y.  
+```{r, echo=FALSE}
+F1.LM <- lm(Y~F1)
+F2.LM <- lm(Y~F2)
+F3.LM <- lm(Y~F3)
+F4.LM <- lm(Y~F4)
+F5.LM <- lm(Y~F5)
+F1_RMSE = sqrt(c(crossprod(F1.LM$residuals))/length(F1.LM$residuals))
+F2_RMSE = sqrt(c(crossprod(F2.LM$residuals))/length(F2.LM$residuals))
+F3_RMSE = sqrt(c(crossprod(F3.LM$residuals))/length(F3.LM$residuals))
+F4_RMSE = sqrt(c(crossprod(F4.LM$residuals))/length(F4.LM$residuals))
+F5_RMSE = sqrt(c(crossprod(F5.LM$residuals))/length(F5.LM$residuals))
+LM_param = data.frame("Slope" = c(F1.LM$coefficients[2],F2.LM$coefficients[2],F3.LM$coefficients[2],F4.LM$coefficients[2],F5.LM$coefficients[2]),
+                      "Intercept" = c(F1.LM$coefficients[1],F2.LM$coefficients[1],F3.LM$coefficients[1],F4.LM$coefficients[1],F5.LM$coefficients[1]),
+                      "RMSE" = c(F1_RMSE,F2_RMSE,F3_RMSE,F4_RMSE,F5_RMSE),
+                      "Relative Accuracy" = c(F1_RMSE/mY,F2_RMSE/mY,F3_RMSE/mY,F4_RMSE/mY,F5_RMSE/mY))
+kable(LM_param, digits = 2, align = "c")
+```
+
+### Graphical Representation of Regression Models
+```{r, echo = FALSE}
+plot(F1,Y,main = "MPG vs. Number of Cylinders (F1)", xlab = "Number of Cylinders", ylab = "MPG")
+abline(F1.LM)
+cf1 <- round(coef(F1.LM), 2)
+eq1 <- paste0("MPG = ", cf1[1],
+             ifelse(sign(cf1[2])==1, " + ", " - "), abs(cf1[2]), " * cyl")
+eq1_2 <- paste0("RMSE = ", round(F1_RMSE, 3))
+mtext(eq1,3,line = -2)
+mtext(eq1_2,3,line = -3)
+```
+For every unit increase in the number of cylinders, there is a change of -3.56 in the MPG rating of the vehicle. As described in previous sections, the linear relationship is negative. As the number of cylinders increases, MPG rating decreases. The regression line appears to explain the central tendency of MPG for a given number of cylinders relatively well, with the exception of 3-cylinder vehicles. However, this single-feature linear model does not capture the variety of MPG values observed for a given number of cylinders. The RMSE is 4.901 MPG for this linear model.  
+
+
+```{r, echo = FALSE}
+plot(F2,Y,main = "MPG vs. Displacement (F2)", xlab = "Displacement", ylab = "MPG")
+abline(F2.LM)
+cf2 <- round(coef(F2.LM), 2) 
+eq2 <- paste0("MPG = ", cf2[1],
+             ifelse(sign(cf2[2])==1, " + ", " - "), abs(cf2[2]), " * dis")
+eq2_2 <- paste0("RMSE = ", round(F2_RMSE, 3))
+mtext(eq2,3,line = -2)
+mtext(eq2_2,3,line = -3)
+```
+
+For every unit increase in displacement, there is a change of -0.06 in the MPG rating of the vehicle. As described in previous sections, the linear relationship is negative. As the displacement increases, MPG rating decreases. The linear model appears to have reasonably good prediction power for moderate displacement, but fails to capture the non-linearity in the low displacement regime and under-predicts MPG for high displacement vehicles. The RMSE is 4.623 MPG for this linear model.      
+
+```{r, echo = FALSE}
+plot(F3,Y,main = "MPG vs. Horsepower (F3)", xlab = "Horsepower", ylab = "MPG")
+abline(F3.LM)
+cf3 <- round(coef(F3.LM), 2) 
+eq3 <- paste0("MPG = ", cf3[1],
+             ifelse(sign(cf3[2])==1, " + ", " - "), abs(cf3[2]), " * hp")
+eq3_2 <- paste0("RMSE = ", round(F3_RMSE, 3))
+mtext(eq3,3,line = -2)
+mtext(eq3_2,3,line = -3)
+```
+
+For every unit increase in horsepower, there is a change of -0.16 in the MPG rating of the vehicle. As described in previous sections, the linear relationship is negative. As the horsepower increases, MPG rating decreases. The linear model appears to have reasonably good prediction power for moderate horsepower, but fails to capture the non-linearity in the low horsepower regime and under-predicts MPG for high horsepower vehicles. The RMSE is 4.893 MPG for this linear model.  
+
+```{r, echo = FALSE}
+plot(F4,Y,main = "MPG vs. Weight (F4)", xlab = "Weight", ylab = "MPG")
+abline(F4.LM)
+cf4 <- round(coef(F4.LM), 2) 
+eq4 <- paste0("MPG = ", cf4[1],
+             ifelse(sign(cf4[2])==1, " + ", " - "), abs(cf4[2]), " * weight")
+eq4_2 <- paste0("RMSE = ", round(F4_RMSE, 3))
+mtext(eq4,3,line = -2)
+mtext(eq4_2,3,line = -3)
+```
+
+For every unit increase in weight, there is a change of -0.01 in the MPG rating of the vehicle. As described in previous sections, the linear relationship is negative. As the weight increases, MPG rating decreases. The linear model appears to have reasonably good prediction power for moderate weight, but fails to capture the non-linearity in the low weight regime and under-predicts MPG for heavy vehicles. The RMSE is 4.893 MPG for this linear model.  
+
+
+```{r, echo = FALSE}
+plot(F5,Y,main = "MPG vs. Acceleration (F4)", xlab = "Acceleration", ylab = "MPG")
+abline(F5.LM)
+cf5 <- round(coef(F5.LM), 2) 
+eq5 <- paste0("MPG = ", cf5[1],
+             ifelse(sign(cf5[2])==1, " + ", " - "), abs(cf5[2]), " * acc")
+eq5_2 <- paste0("RMSE = ", round(F5_RMSE, 3))
+mtext(eq5,3,line = -2)
+mtext(eq5_2,3,line = -3)
+```  
+For every unit increase in acceleration, there is a change of +1.2 in the MPG rating of the vehicle. As described in previous sections, the linear relationship is negative. As the acceleration increases, MPG rating decreases. The linear model appears to have reasonably good prediction power for low acceleration vehicles (<10 s). However, this single-feature linear model does not capture the variety of MPG values observed at higher acceleration ratings. The RMSE is 4.893 MPG for this linear model, the highest RMSE of the 5 single-feature linear models described in this section.  
+
+
+# III. Automatic Classification of Data by KNN  
+## 8. Data Subsetting  
+
+```{r, include = FALSE}
+#Define new data frames for low, mid, high MPG classes. Using the quantiles of .33, .66, and 1.
+auto_lowMPG = subset(auto, mpg < quantile(mpg,0.33))
+auto_medMPG = subset(auto, mpg >= quantile(mpg,0.33) & mpg <= quantile(mpg,0.66))
+auto_highMPG = subset(auto, mpg>quantile(mpg,0.66))
+#Define features datafame (excluding MPG)
+auto_features = auto[-1]
+#count the number of rows for LOW, MED, and HIGH subsets
+n_low = nrow(auto_lowMPG)
+n_med = nrow(auto_medMPG)
+n_high = nrow(auto_highMPG)
+```
+
+Three subsets of data were extracted from the cleaned 'auto' data frame. These three subsets are:  
+* Low MPG: `r min(auto_lowMPG$mpg)` - `r max(auto_lowMPG$mpg)` MPG. This subset contains `r n_low` entries.  
+* Med MPG: `r min(auto_medMPG$mpg)` - `r max(auto_medMPG$mpg)` MPG. This subset contains `r n_med` entries.  
+* High MPG: `r min(auto_highMPG$mpg)` - `r max(auto_highMPG$mpg)` MPG. This subset contains `r n_high` entries.  
+
+```{r, include=FALSE}
+#Define response and feature vectors for each subset
+Y_low = auto_lowMPG$mpg
+Y_med = auto_medMPG$mpg
+Y_high = auto_highMPG$mpg
+
+F1_low = auto_lowMPG$cylinders
+F1_med = auto_medMPG$cylinders
+F1_high = auto_highMPG$cylinders
+
+F2_low = auto_lowMPG$displacement
+F2_med = auto_medMPG$displacement
+F2_high = auto_highMPG$displacement
+
+F3_low = auto_lowMPG$horsepower
+F3_med = auto_medMPG$horsepower
+F3_high = auto_highMPG$horsepower
+
+F4_low = auto_lowMPG$weight
+F4_med = auto_medMPG$weight
+F4_high = auto_highMPG$weight
+
+F5_low = auto_lowMPG$acceleration
+F5_med = auto_medMPG$acceleration
+F5_high = auto_highMPG$acceleration
+```
+
+## 9. Comparison of Low vs. High MPG Classes  
+```{r, echo=FALSE}
+F1_low_hist = ggplot(auto_lowMPG,aes(cylinders)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF1)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F1 (Low MPG)")+ xlab("Cylinders")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F1_high_hist = ggplot(auto_highMPG,aes(cylinders)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF1)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F1 (High MPG)")+ xlab("Cylinders")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F1_low_hist + F1_high_hist
+```
+Based on the comparison of the above histograms, there is minimal intersection between the two subsets. Low MPG vehicles typically have more cylinders, with only a small fraction of low MPG vehicles having 4 cylinders or fewer. Similarly, high MPG vehicles typically have fewer cylinders; nearly all the vehicles in the high MPG subset have 4 cylinders. Several high MPG vehicles have 6 cylinders: this represents the primary intersection between low and high MPG subsets with respect to number of cylinders.  
+```{r, echo=FALSE}
+F2_low_hist = ggplot(auto_lowMPG,aes(displacement)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF2)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F2 (Low MPG)")+ xlab("Displacement")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F2_high_hist = ggplot(auto_highMPG,aes(displacement)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF2)/4, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F2 (High MPG)")+ xlab("Displacement")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F2_low_hist + F2_high_hist
+```
+There is some intersection between the low MPG and high MPG subsets with respect to displacement. High MPG vehicles typically have smaller displacement; nearly all the vehicles in the high MPG subset have displacement less than 200 in^3^. Low MPG vehicles, on the other hand, typically have a larger displacement. A relatively small (but non-negligible) fraction of low MPG vehicles have displacement values less than 200 in^3^. This represents the primary intersection between low and high MPG subsets with respect to displacement.  
+
+```{r, echo=FALSE}
+F3_low_hist = ggplot(auto_lowMPG,aes(horsepower)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF3)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F3 (Low MPG)")+ xlab("Horsepower")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F3_high_hist = ggplot(auto_highMPG,aes(horsepower)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF3)/4, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F3 (High MPG)")+ xlab("Horsepower")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F3_low_hist + F3_high_hist
+```
+There is some intersection between the low MPG and high MPG subsets with respect to horsepower High MPG vehicles typically have lower horsepower ratings; nearly all the vehicles in the high MPG subset have less than 100 hp. Low MPG vehicles, on the other hand, typically have a higher horsepower ratings. A relatively small (but non-negligible) fraction of low MPG vehicles have less than 100 hp. This represents the primary intersection between low and high MPG subsets with respect to horsepower.  
+
+```{r, echo=FALSE}
+F4_low_hist = ggplot(auto_lowMPG,aes(weight)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF4)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F4 (Low MPG)")+ xlab("Weight")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F4_high_hist = ggplot(auto_highMPG,aes(weight)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF4)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F4 (High MPG)")+ xlab("Weight")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F4_low_hist + F4_high_hist
+```
+There is some intersection between the low MPG and high MPG subsets with respect to vehicle weight. Low MPG vehicles are typically heavier, with nearly all low MPG vehicles weighing 3000 lb or more. High MPG vehicles, on the other hand, are typically lighter. Nearly all the vehicles in the high MPG subset weigh less than 2500 lb, though there are several heavy (3000+ lb) high MPG vehicles. This represents the primary intersection between low and high MPG subsets with respect to horsepower.
+```{r, echo=FALSE}
+F5_low_hist = ggplot(auto_lowMPG,aes(acceleration)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF5)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F5 (Low MPG)")+ xlab("Acceleration")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+F5_high_hist = ggplot(auto_highMPG,aes(acceleration)) + 
+  geom_histogram(aes(y=stat(count)/sum(count)),binwidth = round(stdF5)/2, fill = "cadetblue", color="#e9ecef") +
+  labs(title = "Histogram of F5 (High MPG)")+ xlab("Acceleration")+ylab("Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+F5_low_hist + F5_high_hist
+```
+There is significant intersection between the low MPG and high MPG subsets with respect to vehicle acceleration. Low MPG vehicles tend to be faster (higher acceleration) and high MPG vehicles tend to be slower (lower acceleration). However, the intersection between the two subsets suggests that there are many slow low MPG vehicles and many fast high MPG vehicles. This is detrimental in the context of automatic classification, as ideally class subsets should be disjoint or minimally intersecting with respect to each feature.  
+
+## 10. Basic Descriptive Statistics for Low and High MPG Classes  
+
+### Feature Variable 1 (F1) - Number of Cylinders
+```{r, include=FALSE}
+mF1_low = mean(F1_low)
+medF1_low = median(F1_low)
+stdF1_low = sd(F1_low)
+MEF1_low = 1.6*stdF1_low/sqrt(n_low)
+
+mF1_high = mean(F1_high)
+medF1_high = median(F1_high)
+stdF1_high = sd(F1_high)
+MEF1_high = 1.6*stdF1_high/sqrt(n_high)
+```
+
+The mean of feature variable F1 (number of cylinders) is `r round(mF1_low,1)` for the low MPG class, and `r round(mF1_high,1)` for the high MPG class. As previously stated, F1 is a discrete numeric variable with integer values (the number of cylinders in a vehicle engine is a whole number). The median of F1 is `r medF1_low` for the low MPG class, and `r medF1_high` for the high MPG class. The standard deviation of F1 is `r round(stdF1_low,2)` for the low MPG class, and `r round(stdF1_high,2)` for the high MPG class.  
+
+At the 90% confidence level, the margin of error is `r round(MEF1_low,3)` for the low MPG class, and `r round(MEF1_high,3)` for the high MPG class. This essentially means that with 90% confidence, the number of cylinders for vehicles in the low MPG class will be between `r round(mF1_low-MEF1_low,2)` and `r round(mF1_low+MEF1_low,2)`. Similarly, the number of cylinders for vehicles in the high MPG class will be between `r round(mF1_high-MEF1_high,2)` and `r round(mF1_high+MEF1_high,2)`.
+
+The 90% confidence intervals for the low MPG and high MPG classes are disjoint. In fact, the difference ("the gap") between the upper bound of the high MPG class and the lower bound of the low MPG class is `r round(mF1_low-MEF1_low,2) - round(mF1_high+MEF1_high,2)`. This indicates good discriminating power when used as a classification feature.  
+
+### Feature Variable 2 (F2) - Engine Displacement (Cubic inches)
+```{r, include=FALSE}
+mF2_low = mean(F2_low)
+stdF2_low = sd(F2_low)
+MEF2_low = 1.6*stdF2_low/sqrt(n_low)
+
+mF2_high = mean(F2_high)
+stdF2_high = sd(F2_high)
+MEF2_high = 1.6*stdF2_high/sqrt(n_high)
+```
+
+The mean of feature variable F2 (engine displacement) is `r round(mF2_low,1)` for the low MPG class, and `r round(mF2_high,1)` for the high MPG class. The standard deviation of F2 is `r round(stdF2_low,2)` for the low MPG class, and `r round(stdF2_high,2)` for the high MPG class.  
+
+At the 90% confidence level, the margin of error is `r round(MEF2_low,3)` for the low MPG class, and `r round(MEF2_high,3)` for the high MPG class. This essentially means that with 90% confidence, the engine displacement for vehicles in the low MPG class will be between `r round(mF2_low-MEF2_low,2)` and `r round(mF2_low+MEF2_low,2)`. Similarly, the engine displacement for vehicles in the high MPG class will be between `r round(mF2_high-MEF2_high,2)` and `r round(mF2_high+MEF2_high,2)`.  
+
+The 90% confidence intervals for the low MPG and high MPG classes are disjoint. The difference between the upper bound of the high MPG class and the lower bound of the low MPG class is `r round(mF2_low-MEF2_low,2) - round(mF2_high+MEF2_high,2)`. This indicates good discriminating power when used as a classification feature. 
+
+### Feature Variable 3 (F3) - Engine Horsepower (hp)
+```{r, include=FALSE}
+mF3_low = mean(F3_low)
+stdF3_low = sd(F3_low)
+MEF3_low = 1.6*stdF3_low/sqrt(n_low)
+
+mF3_high = mean(F3_high)
+stdF3_high = sd(F3_high)
+MEF3_high = 1.6*stdF3_high/sqrt(n_high)
+```
+
+The mean of feature variable F3 (engine horsepower) is `r round(mF3_low,1)` for the low MPG class, and `r round(mF3_high,1)` for the high MPG class. The standard deviation of F3 is `r round(stdF3_low,2)` for the low MPG class, and `r round(stdF3_high,2)` for the high MPG class.  
+
+At the 90% confidence level, the margin of error is `r round(MEF3_low,3)` for the low MPG class, and `r round(MEF3_high,3)` for the high MPG class. This essentially means that with 90% confidence, the engine horsepower for vehicles in the low MPG class will be between `r round(mF3_low-MEF3_low,2)` and`r round(mF3_low+MEF3_low,2)`. Similarly, the engine horsepower for vehicles in the high MPG class will be between `r round(mF3_high-MEF3_high,2)` and `r round(mF3_high+MEF3_high,2)`.  
+
+The 90% confidence intervals for the low MPG and high MPG classes are disjoint. The difference between the upper bound of the high MPG class and the lower bound of the low MPG class is `r round(mF3_low-MEF3_low,2) - round(mF3_high+MEF3_high,2)`. This indicates good discriminating power when used as a classification feature.  
+
+### Feature Variable 4 (F4) - Vehicle Weight (lb)
+```{r, include=FALSE}
+mF4_low = mean(F4_low)
+stdF4_low = sd(F4_low)
+MEF4_low = 1.6*stdF4_low/sqrt(n_low)
+
+mF4_high = mean(F4_high)
+stdF4_high = sd(F4_high)
+MEF4_high = 1.6*stdF4_high/sqrt(n_high)
+```
+
+The mean of feature variable F4 (vehicle weight) is `r round(mF4_low,1)` for the low MPG class, and `r round(mF4_high,1)` for the high MPG class. The standard deviation of F4 is `r round(stdF4_low,2)` for the low MPG class, and `r round(stdF4_high,2)` for the high MPG class.  
+
+At the 90% confidence level, the margin of error is `r round(MEF4_low,3)` for the low MPG class, and `r round(MEF4_high,3)` for the high MPG class. This essentially means that with 90% confidence, the vehicle weight for vehicles in the low MPG class will be between `r round(mF4_low-MEF4_low,2)` and`r round(mF4_low+MEF4_low,2)`. Similarly, the vehicle weight for vehicles in the high MPG class will be between `r round(mF4_high-MEF4_high,2)` and `r round(mF4_high+MEF4_high,2)`.
+
+The 90% confidence intervals for the low MPG and high MPG classes are disjoint. The difference between the upper bound of the high MPG class and the lower bound of the low MPG class is `r round(mF4_low-MEF4_low,2) - round(mF4_high+MEF4_high,2)`. This indicates good discriminating power when used as a classification feature.
+
+### Feature Variable 5 (F5) - Vehicle Acceleration (seconds)
+```{r, include=FALSE}
+mF5_low = mean(F5_low)
+stdF5_low = sd(F5_low)
+MEF5_low = 1.6*stdF5_low/sqrt(n_low)
+
+mF5_high = mean(F5_high)
+stdF5_high = sd(F5_high)
+MEF5_high = 1.6*stdF5_high/sqrt(n_high)
+```
+
+The mean of feature variable F5 (vehicle acceleration) is `r round(mF5_low,1)` for the low MPG class, and `r round(mF5_high,1)` for the high MPG class. The standard deviation of F5 is `r round(stdF5_low,2)` for the low MPG class, and `r round(stdF5_high,2)` for the high MPG class.  
+
+At the 90% confidence level, the margin of error is `r round(MEF5_low,3)` for the low MPG class, and `r round(MEF5_high,3)` for the high MPG class. This essentially means that with 90% confidence, the vehicle acceleration for vehicles in the low MPG class will be between `r round(mF5_low-MEF5_low,2)` and`r round(mF5_low+MEF5_low,2)`. Similarly, the vehicle acceleration for vehicles in the high MPG class will be between `r round(mF5_high-MEF5_high,2)` and `r round(mF5_high+MEF5_high,2)`.
+
+The 90% confidence intervals for the low MPG and high MPG classes are disjoint. The difference between the upper bound of the high MPG class and the lower bound of the low MPG class is `r round(mF5_high+MEF5_high,2) - round(mF5_low-MEF5_low,2)`. Despite the significant intersection observed in the histogram of acceleration for the two subsets, the 90% confidence interval suggests good discriminating power when acceleration is used as a classification feature.  
+
+## 11. Application of the k-Nearest Neighbor (kNN) Automatic Classifier  
+```{r, include = FALSE}
+#Adding column with class label for each subset
+label = c(rep("LOW",n_low))
+auto_lowMPG = cbind(auto_lowMPG,label)
+
+label = c(rep("MED",n_med))
+auto_medMPG = cbind(auto_medMPG, label)
+
+label = c(rep("HIGH",n_high))
+auto_highMPG = cbind(auto_highMPG, label)
+```
+
+
+```{r, include = FALSE}
+#Using rsample and caret packages.
+#The initial_split function randomly partitions each normalized data set into 80/20 training/test splits.
+low_Sample <- initial_split(auto_lowMPG, prop = .8)
+med_Sample <- initial_split(auto_medMPG, prop = .8)
+high_Sample <- initial_split(auto_highMPG, prop = .8)
+
+#Each partition is re-grouped into a global training/test data frame.
+Train_data <- rbind(training(low_Sample),training(med_Sample),training(high_Sample))
+Test_data <- rbind(testing(low_Sample),testing(med_Sample),testing(high_Sample))
+```
+
+In this section, the k-Nearest Neighbor (kNN) automatic classification algorithm will be applied to the auto data set. In previous sections, data sub-setting based on mpg quantiles was described in detail. Here, the data is further modified before implementation into the algorithm.
+
+First, every case was labeled with its true classification (Low, Med, High) by appending a label column to each subset. Next, the subsets were randomly split into training and test subsets; the 80%/20% heuristic for training/test set size was used. Finally, the six subsets (three training, three test) were re-grouped into a global training set and a global test set. Following this random partitioning and recombination, set size and composition is outlined below:  
+
+* Training Set Size: `r nrow(Train_data)`cases, `r round(nrow(Train_data)/nrow(auto)*100,2)`% of total.
+** Low MPG: `r nrow(subset(Train_data, label == "LOW"))` cases.
+** Med MPG: `r nrow(subset(Train_data, label == "MED"))` cases.
+** High MPG: `r nrow(subset(Train_data, label == "HIGH"))` cases.
+* Test Set Size: `r nrow(Test_data)`cases, `r round(nrow(Test_data)/nrow(auto)*100,2)`% of total.
+** Low MPG: `r nrow(subset(Test_data, label == "LOW"))` cases.
+** Med MPG: `r nrow(subset(Test_data, label == "MED"))` cases.
+** High MPG: `r nrow(subset(Test_data, label == "HIGH"))` cases.
+
+```{r, include = FALSE}
+#k = 5
+#applied on the train dataset 
+k5_train = sum(Train_data[,7] == knn(Train_data[2:6], Train_data[2:6], Train_data[,7], k = 5)) / nrow(Train_data[7])
+
+#applied on the test dataset
+k5_test = sum(Test_data[,7] == knn(Train_data[2:6], Test_data[2:6], Train_data[,7], k = 5)) / nrow(Test_data[7])
+```
+Using a k-value equal to 5 (classification based on 5 nearest neighbors), the training set accuracy was `r round(k5_train,3)*100`%. As expected, the test set accuracy was slightly lower, at `r round(k5_test,3)*100`%. Accuracy is calculated by totaling the number of cases that were correctly classified and dividing by the total number of cases:
+
+
+% Accuracy = # of Training Classified Correctly/Total # of Cases
+
+
+## 12. Determining Best K-Value
+```{r}
+#____________  graphs
+K <- c(3,5,7,9,11,13,15,17,19,29,39)
+TrainAccuracy <- c()
+TestAccuracy <- c()
+for (i in 1:length(K)){
+  TrainAccuracy[i] <- sum(Train_data[,7] == knn(Train_data[2:6], Train_data[2:6], Train_data[,7], k = K[i])) / nrow(Train_data[7])
+  TestAccuracy[i] <- sum(Test_data[,7] == knn(Train_data[2:6], Test_data[2:6], Train_data[,7], k = K[i])) / nrow(Test_data[7])
+}
+accuracy_df <- cbind(TrainAccuracy, TestAccuracy, K)
+accuracy_df <- as.data.frame(accuracy_df)
+
+ggplot(accuracy_df, aes(K)) +
+  geom_line(aes(y = TrainAccuracy, color = "Training Set")) + 
+  geom_point(aes(y = TrainAccuracy),shape = 15) + 
+  geom_line(aes(y = TestAccuracy, color = "Test Set")) + 
+  geom_point(aes(y = TestAccuracy),shape = 16) +
+  labs(title = "Training & Test Set Accuracy",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue"))
+
+```
+
+```{r, echo = TRUE}
+training_matrix <- knn(Train_data[2:6], Train_data[2:6], Train_data[,7], k = 5)
+y <- table(training_matrix,Train_data[,7])
+confusionMatrix(y)[2]
+
+testing_matrix <-knn(Train_data[2:6], Test_data[2:6], Train_data[,7], k = 5)
+y <- table(testing_matrix,Test_data[,7])
+confusionMatrix(y)[2]
+```  
+
+## 13. Effect of Feature Normalization on kNN Accuracy
+```{r, include = FALSE}
+normalize = function(x){
+  return((x - mean(x))/sd(x))
+}
+#Creating new df "auto_norm" by normalizing feature data from original auto data set.
+auto_norm = as.data.frame(lapply(auto[,2:6], normalize))
+auto_norm = cbind(auto[1], auto_norm) #adding mpg column to normalized feature data.
+
+#Subsetting auto_norm df into low, med, high classes.
+auto_lowMPG_norm = subset(auto_norm, mpg < quantile(mpg,0.33))
+auto_medMPG_norm = subset(auto_norm, mpg >= quantile(mpg,0.33) & mpg <= quantile(mpg,0.66))
+auto_highMPG_norm = subset(auto_norm, mpg>quantile(mpg,0.66))
+
+#Adding column with class label for each subset
+label = c(rep("LOW",dim(auto_lowMPG_norm)[1]))
+auto_lowMPG_norm = cbind(auto_lowMPG_norm,label)
+
+label = c(rep("MED",dim(auto_medMPG_norm)[1]))
+auto_medMPG_norm = cbind(auto_medMPG_norm, label)
+
+label = c(rep("HIGH",dim(auto_highMPG_norm)[1]))
+auto_highMPG_norm = cbind(auto_highMPG_norm, label)
+```
+
+
+```{r, include = FALSE}
+#Using rsample and caret packages.
+#The initial_split function randomly partitions each normalized data set into 80/20 training/test splits.
+low_Sample_n <- initial_split(auto_lowMPG_norm, prop = .8)
+med_Sample_n <- initial_split(auto_medMPG_norm, prop = .8)
+high_Sample_n <- initial_split(auto_highMPG_norm, prop = .8)
+
+#Each partition is re-grouped into a global training/test data frame.
+Train_data_n <- rbind(training(low_Sample_n),training(med_Sample_n),training(high_Sample_n))
+Test_data_n <- rbind(testing(low_Sample_n),testing(med_Sample_n),testing(high_Sample_n))
+```
+In this section, the k-Nearest Neighbor (kNN) automatic classification algorithm will be applied to the feature-normalized auto data set. The major difference between this section and sections 11 & 12 is the normalization (center and re-scale) of all features. This allows the kNN algorithm to compute a meaningful distance between neighboring points and should result in better classification performance. The normalization formula is described below. It should be noted that only feature variables (F1, ..., F5) were normalized, not the response variable (Y).  
+
+Vij = [Uij - mean(Uj)]/stdev(Uj)  
+* Vij represents normalized entry i (i = 1 to 392) of feature variable j (j = 1 to 5).   
+* Ui represents raw entry i of feature variable j.  
+* Mean(Uj) represents the mean of feature variable j.
+* Stdev(Uj) represents the standard deviation of feature variable j.  
+
+The normalized data set was then partitioned into low, mid, and high MPG subsets based on similar quantiles described in previous sections of this report. Every case was labeled with its true classification (Low, Med, High) by appending a label column to each subset. The subsets were randomly split into training and test subsets; the 80%/20% heuristic for training/test set size was used. The six subsets (three training, three test) were re-grouped into a global normalized training set and a global normalized test set.
+
+
+```{r, include = FALSE}
+#k = 5
+#applied on the train dataset 
+k5_train_n = sum(Train_data_n[,7] == knn(Train_data_n[2:6], Train_data_n[2:6], Train_data_n[,7], k = 5)) / nrow(Train_data_n[7])
+
+#applied on the test dataset
+k5_test_n = sum(Test_data_n[,7] == knn(Train_data_n[2:6], Test_data_n[2:6], Train_data_n[,7], k = 5)) / nrow(Test_data_n[7])
+```
+
+Using a k-value equal to 5 (classification based on 5 nearest neighbors), the training set accuracy was `r round(k5_train_n,3)*100`%. As expected, the test set accuracy was slightly lower, at `r round(k5_test_n,3)*100`%. Compare this to the raw data set with `r round(k5_train,3)*100`% training set accuracy and `r round(k5_test,3)*100`% test set accuracy. Normalization of feature data had minimal impact on training set accuracy, but a `r round(k5_test_n,3)*100 - round(k5_test,3)*100`% difference can be observed for test set accuracy.
+
+
+```{r, include=FALSE}
+#____________  graphs
+K <- c(3,5,7,9,11,13,15,17,19,29,39)
+TrainAccuracy_n <- c()
+TestAccuracy_n <- c()
+for (i in 1:length(K)){
+  TrainAccuracy_n[i] <- sum(Train_data_n[,7] == knn(Train_data_n[2:6], Train_data_n[2:6], Train_data_n[,7], k = K[i])) / nrow(Train_data_n[7])
+  TestAccuracy_n[i] <- sum(Test_data_n[,7] == knn(Train_data_n[2:6], Test_data_n[2:6], Train_data_n[,7], k = K[i])) / nrow(Test_data_n[7])
+}
+accuracy_df_n <- cbind(TrainAccuracy_n, TestAccuracy_n, K)
+accuracy_df_n <- as.data.frame(accuracy_df_n)
+
+ggplot(accuracy_df_n, aes(K)) +
+  geom_line(aes(y = TrainAccuracy_n, color = "Training Set")) + 
+  geom_point(aes(y = TrainAccuracy_n),shape = 15) + 
+  geom_line(aes(y = TestAccuracy_n, color = "Test Set")) + 
+  geom_point(aes(y = TestAccuracy_n),shape = 16) +
+  labs(title = "Training & Test Set Accuracy (Normalized Data)",x="k-value",y="% Accuracy") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_manual("",
+                     breaks = c("Training Set", "Test Set"),
+                     values = c("Training Set" = "red", "Test Set" = "blue"))
+```
+
+```{r, echo = TRUE}
+training_matrix_n <- knn(Train_data_n[2:6], Train_data_n[2:6], Train_data_n[,7], k = 5)
+y <- table(training_matrix_n,Train_data_n[,7])
+confusionMatrix(y)[2]
+
+testing_matrix_n <-knn(Train_data_n[2:6], Test_data_n[2:6], Train_data_n[,7], k = 5)
+y <- table(testing_matrix,Test_data_n[,7])
+confusionMatrix(y)[2]
+
+```
+
+
+
+
