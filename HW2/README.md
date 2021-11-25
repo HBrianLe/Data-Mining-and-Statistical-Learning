@@ -10,7 +10,7 @@ This project was done in collaboration with two other students in this Graduate 
 <li>The project has three parts of: </li>
 <ul>
 <li>Selecting the data from 4 fonts and explore each one of the given font and the data that it may contain. </li>
-<li>Create a KNN model on the dataset as a whold to predict one of four classes that we have selected.</li>
+<li>Create a KNN model on the dataset as a whole to predict one of four classes that we have selected.</li>
 <li>Apply PCA on the given dataset to reduce the dimensions of the dataset while applying the KNN model to the dataset again after the transformation. </li>
 </ul>
 </ul>

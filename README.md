@@ -15,19 +15,19 @@ The projects in this class include but not limited to the following algorithms:
 
 <li> K-Nearest Neighbors</li>
 <li> K-Means Clustering </li>
-<li> Many more Algorithms as the semester progresses   </li>
+<li> Random Forest</li>
+<li> Support Vector Machines</li>
 
 ___
 
 Within many of these algorithms, the following topics may be covered:
 
-<li> Using Principal Component Analysis for Dimentionalty reduction</li>
+<li> Using Principal Component Analysis for Dimensionality reduction</li>
 <li> Partition of data for training and testing</li>
 <li> Performance Measures of errors with confidence intervals </li>
 <li> The use of markdown and LaTeX encoding to write files   </li>
-<li> Many more concepts as the semester progresses </li>
+<li> Inbalance Class Amplification  </li>
+<li> Train and test performance evaluation   </li>
 
-
-
-This class is taught at the University of Houston by Robert Azencott - Professor of Mathematics. 
+This class is taught at the University of Houston by Dr. Robert Azencott - Professor of Mathematics. 
 
